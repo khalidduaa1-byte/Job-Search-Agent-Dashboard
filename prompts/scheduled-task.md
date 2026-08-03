@@ -113,48 +113,58 @@ a broken task.
 
 ## Routine 2: Friday roundup
 
+**This one needs an input from you: click Export in the dashboard and paste the JSON into the run.**
+Without it the roundup can only do half of the still-open check, and it will say so rather than invent
+a week. That is deliberate.
+
 ```
 You are writing Duaa Khalid's Friday roundup for her job search. This is not a coding task: do not
 modify, commit or push any code, and do not open a pull request.
 
-Read prompts/weekly-roundup.md, prompts/profile.md and prompts/scoring-rubric.md from the
-repository, or from
-https://raw.githubusercontent.com/khalidduaa1-byte/Job-Search-Agent-Dashboard/main/<path> if there is
-no checkout. If you cannot read them, stop and say so.
+Read prompts/weekly-roundup.md, prompts/profile.md and prompts/scoring-rubric.md from the repository,
+or from https://raw.githubusercontent.com/khalidduaa1-byte/Job-Search-Agent-Dashboard/main/<path> if
+there is no checkout. If you cannot read them, stop and say so.
 
-This is the weekly read on what the week turned up, not a fifth search.
+Your input is a BOARD EXPORT, not the four daily digests. Do not go looking for the digests: no tool
+can read another routine's past sessions. The board is the week's digests already merged and
+deduplicated, and it carries what the digests never could, which is the status she has since set.
 
-You probably cannot read this week's digests, and you must not pretend otherwise. If they are pasted
-in, or a board export or Agent brief is attached, use them. If nothing was supplied, say so in your
-first line and do the part you can. Never reconstruct a digest you were not given, never state a
-score you did not receive, and never claim a role appeared this week if you cannot see the digest
-that contained it. Using web search to rebuild the week would be a fifth search dressed as a
-roundup, which is the one thing this task forbids.
+In order of preference:
+1. A board export, the JSON from the Export button, pasted or attached. Every role with score,
+   status, hidden, first_seen and last_seen.
+2. An Agent brief, which covers what is unactioned and gives you URLs, but not the full week.
+3. Nothing. Then say so in your first line, do the part of the still-open check you can, and stop.
 
-What you can always do is the still-open check, and it is why this task exists. For the highest
-scoring roles you were given, up to five, open the posting again and mark it still open, closed, or
-could not confirm. Do not guess. Re-opening a posting you were handed is not new searching. If a role
-has closed, say so and tell her to set that row to closed on the board herself, because status is
-hers to set and an import must never write it.
+"This week" means first_seen within the last seven days. Older rows are on the board but are not this
+week's news, though they still belong in the unactioned section if they are 90 plus and untouched,
+because a strong role sitting for a fortnight matters more than one from Tuesday, not less.
 
-Emit no JSON. None. Everything in a roundup was already imported during the week, and re-importing
-bumps last_seen on every row, which makes the board report that the whole week arrived today and
-wrecks the latest-report view. That is tested behaviour, not a worry.
+Never reconstruct the week from a fresh search. That is a fifth search dressed as a roundup and it is
+the one thing this task forbids. Never state a score you were not given.
 
-Section 3, what is sitting unactioned, means anything at 90 plus she has not applied to. Applied
-state lives only in her browser and there is no server, so you cannot work it out. The dashboard's
-"Agent brief" button produces exactly this list with a generation date. With it, use it and say when
-it was generated. Without it, write one line saying you cannot tell, name the Agent brief button as
-the fix, and stop. A guess here is wrong every Friday in the one section that carries a deadline.
+The still-open check is the reason this task exists, and it works with only a list of URLs. For the
+five highest scoring roles in the input, open the posting again and mark it still open, closed, or
+could not confirm. Do not guess. Re-opening a posting you were handed is not new searching. When a
+role has closed, say so and tell her to set that row to closed herself, because status is hers and an
+import must never write it.
 
-Follow weekly-roundup.md section 3 for shape: the read on the week in three sentences at most, the
-top five with the still-open check, what is sitting unactioned, and one thing to change next week. If
+Emit no JSON. None. Everything in a roundup is already on the board, and re-importing bumps last_seen
+on every row, which makes the board report that the whole week arrived today.
+
+For what is sitting unactioned: every row with score 90 or above, status new or saved, and hidden
+false. Say when the input was generated, because a three day old export is three days of triage out of
+date.
+
+Follow weekly-roundup.md section 3 for shape: the read on the week in three sentences at most, the top
+five with the still-open check, what is sitting unactioned, and one thing to change next week. If
 there is nothing real to change, write "Nothing to change" and stop.
+
+Begin with one line stating whether you could read the three files and what input you were given, so a
+blocked run is visible at a glance. Also send the roundup as a markdown file with SendUserFile, even
+on a blocked run, so it reaches her rather than only sitting in a session transcript.
 
 No em dashes. If the week was thin, say the week was thin.
 ```
-
----
 
 ## Why the prompts live in the repo rather than only in the routine
 

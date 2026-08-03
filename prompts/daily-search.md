@@ -42,8 +42,9 @@ Cover, in this order:
    - **New York City or remote-US.** A San Francisco requisition is not actionable while she is
      enrolled: emit it only where the company has a New York office, and say so in the rationale.
    - **Start dates on or after May 2027** for full-time, summer 2027 for an internship. She is F-1
-     and the clean CPT window is summer 2027. A Summer or Fall 2026 start is not a low score, it is
-     not a record.
+     and the clean CPT window is summer 2027. A **stated** Summer or Fall 2026 start is not a low
+     score, it is not a record. A posting that **states no start date at all**, which is most of
+     them, is emitted with the 25-point deduction in `scoring-rubric.md` rather than dropped.
    - Posted or reposted within the last 14 days.
    - Re-emitting a posting already on the board is fine. The dashboard merges on the posting URL
      and reports it as updated rather than duplicating it, and it never overwrites her triage.
@@ -86,11 +87,17 @@ Take the highest-scoring posting. Tailor `resume/master-resume.md` for it using
 If nothing scored 80 or above, do not tailor anything. Say so in the email in one line. A
 tailored resume for a 62 is wasted work and it teaches her to ignore the attachment.
 
-**80 is not a band boundary, and it is doing a specific job.** A full-time posting with no stated
-start date caps at 70, so the 80 threshold means **a tailored resume only ever goes to a role she can
-actually start**: one with a stated start date from May 2027, or an internship for summer 2027. That
-is deliberate. Do not lower it, and do not tailor for a capped role because it was the best of a thin
-morning.
+**Measure the 80 against the fit score before the start-date deduction**, and after every other cap.
+Most postings state no start date, so measuring after the deduction would mean tailoring nothing on a
+normal morning, and step 4 would quietly stop happening while the README still claimed it ran. The
+deduction is a statement about actionability, not about fit, and a strong-fit role is worth a tailored
+resume ready for when it reopens.
+
+Every other cap does count against the 80. A role capped at 60 for a PM-title screen is not a
+tailoring target, because that cap is about her odds, not about timing.
+
+Say in the email which one it was and whether it is actionable today, so the attachment never implies
+a deadline that does not exist.
 
 ## 5. Send the email
 

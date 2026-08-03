@@ -37,10 +37,15 @@ immediate start**. Read literally against constraint 2 that would drop almost ev
 in the market, which is useless. Read loosely it lets everything through, which defeats the filter.
 Neither is right, so:
 
-- **Full-time, no stated start date: emit it, and cap it at 70.** Presume an immediate start, because
-  that is what it means. The cap keeps it visible without ever letting it become the top opportunity
-  of the day or earn a tailored resume, and the rationale must say `start date unstated, presume
-  immediate, so this is pipeline rather than an application`.
+- **Full-time, no stated start date: emit it, and subtract 25.** Presume an immediate start, because
+  that is what it means. The rationale must say `start date unstated, presume immediate, so this is
+  pipeline rather than an application`.
+
+  **Subtract, do not cap.** A flat cap at 70 was tried and it was wrong: four well-fitting postings
+  with raw scores of 90, 87, 84 and 79 all rendered as exactly 70 and then sorted alphabetically by
+  company, so the board could no longer rank the thing it exists to rank. A deduction preserves the
+  fit ordering underneath. The maximum possible score is 100, so minus 25 also guarantees an
+  unstated-start role can never reach the strong band, which is the other thing the cap was for.
 - **Full-time, stated start in or after May 2027**, or aimed at 2027 graduates, or explicitly
   flexible on start: **fully actionable, no cap.** These are the roles the search exists to find,
   and they are what should reach the strong band.
@@ -133,8 +138,8 @@ Judge the **work**, not the company. Company type is scored once, on company sha
 - 45: **Tier 1.** Owns deployment or adoption of a technical product inside a customer's operation,
   the GTM and adoption flavour
 - 43: **Tier 1.** Technical account management or enterprise customer success: owning a book of
-  enterprise accounts through onboarding, adoption, renewals and expansion. Just below deployment on
-  ceiling, not on fit. **Highest offer probability on the list and the fastest yes**
+  enterprise accounts through renewals and expansion. Just below deployment on ceiling, not on fit.
+  **Highest offer probability on the list and the fastest yes**
 - 40: **Tier 1.** Solutions consulting or pre-sales, the discovery-and-scoping flavour
 - 30: post-sales, enablement or solutions work that is not account-owning, or product ownership of an
   internal decision or data tool. **This is her old job, not a target**, so it does not carry a tier
@@ -171,10 +176,27 @@ Six signals count. Score by **how many the posting states**, not how many you ca
 and it scores nothing. This axis was unanchored prose once and the same posting could move 6 points
 on the reader's mood, which is enough to cross a band boundary on its own.
 
-**Do not count a signal here that already earned the role-core band.** If the role core is 43 for
-owning a book of accounts, signal 1 is already paid for: do not count it twice. The two axes measure
+**Do not count a signal here that the role-core band already paid for.** The two axes measure
 different things, the job shape and the problem shape, and double-counting the overlap is what let
-Tier 1 postings clear 90 too easily.
+Tier 1 postings clear 90 too easily. "Use your judgment" is not good enough here, because a 4-point
+call is exactly the size that crosses 88 into 90, so the mapping is fixed:
+
+| Role core | Already pays for | Signals still countable | Domain max |
+| --- | --- | --- | --- |
+| 45, deployment or adoption | 2 | 1, 3, 4, 5, 6 | 20 |
+| 43, TAM or enterprise CSM | 1 | 2, 3, 4, 5, 6 | 20 |
+| 40, solutions or pre-sales | 5 | 1, 2, 3, 4, 6 | 20 |
+| 30, post-sales, enablement or internal product | 2 | 1, 3, 4, 5, 6 | 20 |
+| 26, Tier 2 GTM | none | all six | 20 |
+| 20, Tier 3 product or analyst | none | all six | 20 |
+| 16, adjacent commercial | none | all six | 20 |
+| 10, analyst against a spec | none | all six | 20 |
+
+Each band pays for at most one signal, and five countable signals still reach 20, so **every band can
+reach its full domain score** and the ceiling table below is arithmetic rather than assertion. That is
+deliberate: an earlier version had the 43 band paying for two signals, which silently cut its ceiling
+to 94 while the published table said 98, and cut the 30 band to 81, tying it with Tier 2 and erasing
+the gap between her old job and a GTM role.
 
 **Geography and timing, up to 15.** She is in New York from mid-August 2026 and the MEng runs to
 May 2027, so location is about what she can actually take.
@@ -238,9 +260,9 @@ set above a role's ceiling does nothing, and two of these used to be in exactly 
 - **A non-actionable location: cap at 75.** On-site outside New York at a company that does have a
   New York office. It is a relationship, not an application, and it must not outrank a role she can
   take.
-- **Full-time with no stated start date: cap at 70.** Presumed immediate start. See the start-date
-  section above. This is the most frequently applied cap in the whole rubric, because most postings
-  state no date.
+- **Full-time with no stated start date: subtract 25**, which is a deduction rather than a cap and is
+  applied before the caps. Presumed immediate start. See the start-date section above. This is the
+  most frequently applied adjustment in the whole rubric, because most postings state no date.
 - **Requires 8 or more years in the exact function: cap at 65.**
 - **Rules out future visa sponsorship: cap at 40**, and say so in the rationale. Read the work
   authorisation section above first: "must be authorised to work in the US" is **not** this.

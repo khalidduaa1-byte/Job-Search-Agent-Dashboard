@@ -61,8 +61,13 @@ while chasing a feature.
      actionable while enrolled**, and is worth emitting only where the company has a New York
      office, with the constraint named in the rationale.
    - **F-1, and authorization is timing-gated.** Full-time start dates on or after **May 2027**,
-     internships **summer 2027**. Summer and Fall 2026 are impossible. The clean CPT window is
-     summer 2027, after one full academic year.
+     internships **summer 2027**. The clean CPT window is summer 2027, after one full academic year.
+     A **stated** earlier start is dropped. A posting stating **no** start date, which is most of
+     them, is emitted with a 25-point deduction: dropping those would empty the digest, and exempting
+     them would make the filter meaningless. Do not collapse those two cases back together, and if
+     you change one file here change all four: this rule lives in `prompts/profile.md`,
+     `prompts/scoring-rubric.md`, `prompts/daily-search.md` and this list, and it was inconsistent
+     across them once.
    - **Tier 4 roles are not sourced**: GTM Engineer at a lab, FDE or Applied AI Engineer against a
      real SWE bar, SWE, MLE.
 4. **Classify on the requirements section, not the title.** "Forward deployed" and "AI deployment"

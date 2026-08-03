@@ -91,10 +91,15 @@ eq('derived stat tiles',
 eq('five rows to action, three already in the pipeline',
   (await page.textContent('#result-count')).trim(), '5 to action, 3 already in your pipeline');
 eq('the jobs chip counts the latest report', await page.textContent('#latest-count'), '8');
-eq('best opportunity is the highest score on the board',
-  await page.textContent('#best-company'), 'Lumina Systems');
+/* The hero card is a recommendation, so it must skip roles already actioned.
+   Lumina is the highest score on the sample board at 96 and is already applied;
+   Halyard at 93 is the best thing she can act on today. This used to read
+   Lumina every morning after she had applied, while the list below correctly
+   omitted it. */
+eq('best opportunity skips a role already applied to',
+  await page.textContent('#best-company'), 'Halyard Compute');
 ok('best opportunity meta carries role, place and score',
-  (await page.textContent('#best-meta')) === 'AI Deployment Manager · New York, NY · 96 match score',
+  (await page.textContent('#best-meta')) === 'Deployment Strategist · New York, NY · 93 match score',
   await page.textContent('#best-meta'));
 eq('rows are ordered by score, highest first',
   await page.$$eval('.score', (n) => n.map((x) => x.textContent)), ['93', '88', '84', '78', '72']);
@@ -300,7 +305,63 @@ await page.click('#import-run');
 await page.waitForSelector('#import-report:not([hidden])');
 ok('invalid JSON is reported in the dialog',
   (await page.textContent('#import-report')).includes('not valid JSON'));
+ok('and the message says what a good paste looks like',
+  (await page.textContent('#import-report')).includes('first'));
 await page.click('#import-cancel');
+
+/* -- A fenced paste, which is the likeliest one --------------------
+   The digest puts the array in a markdown code block and a phone mail client
+   renders the fence literally, so this is what actually gets pasted before
+   work. Failing it would break the only manual step in the pipeline. */
+console.log('\nFenced and prefixed pastes');
+await reset(page);
+const fenced = '```json\n' + JSON.stringify(digest) + '\n```';
+await page.click('#import-open');
+await page.fill('#import-txt', fenced);
+await page.click('#import-run');
+await page.waitForSelector('#import-report:not([hidden])');
+const fencedReport = await page.textContent('#import-report');
+await page.click('#import-cancel');
+ok('a markdown code fence is stripped rather than rejected',
+  /1 added, 2 updated/.test(fencedReport), fencedReport);
+const prefixed = 'Paste into the dashboard:\n\n' + JSON.stringify(digest);
+await page.click('#import-open');
+await page.fill('#import-txt', prefixed);
+await page.click('#import-run');
+await page.waitForSelector('#import-report:not([hidden])');
+const prefixedReport = await page.textContent('#import-report');
+await page.click('#import-cancel');
+ok('leading prose before the array is tolerated',
+  /0 added, 3 updated/.test(prefixedReport), prefixedReport);
+
+/* -- The same posting from a second board -------------------------
+   The agent has no memory of which board it used yesterday, so a role she has
+   applied to can come back under an aggregator URL. With a URL-only dedup key
+   that imported as a fresh row at status new and defeated rule 2. */
+console.log('\nDedup across two boards');
+await reset(page);
+await page.locator('.row').first().locator('summary').click();
+await page.locator('.row').first().locator('[data-act="applied"]').click();
+await page.waitForTimeout(50);
+const listAfterApply = await rowIds(page);
+const reHalyard = (await board(page)).find((r) => r.company === 'Halyard Compute');
+eq('the role is applied', reHalyard.status, 'applied');
+const reboarded = [{
+  title: reHalyard.title, company: reHalyard.company, location: reHalyard.location,
+  remote: reHalyard.remote, source: 'linkedin',
+  url: 'https://example-aggregator.test/jobs/' + reHalyard.id,
+  apply_url: 'https://example-aggregator.test/jobs/' + reHalyard.id + '/apply',
+  posted: reHalyard.posted, score: reHalyard.score,
+  rationale: 'Same posting, found on an aggregator under a different URL.',
+  signal: 'aggregator listing', resume_tailored: false
+}];
+const reboardReport = await importJSON(page, reboarded);
+ok('the same role from another board updates rather than adding',
+  /0 added, 1 updated/.test(reboardReport), reboardReport);
+eq('the board did not grow', (await board(page)).length, 10);
+eq('and it did not come back into the daily list', await rowIds(page), listAfterApply);
+eq('its applied status survived',
+  (await board(page)).find((r) => r.company === 'Halyard Compute').status, 'applied');
 
 /* -- Export -------------------------------------------------------- */
 console.log('\nExport');

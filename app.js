@@ -71,16 +71,36 @@
   /* The dedup key. Canonical URL when we have one, because the same
      posting reaches us from two boards under two different titles.
      Otherwise fall back to the employer and role. */
-  function dedupKey(rec) {
+  function urlKey(rec) {
     var u = safeUrl(rec.url);
-    if (u) {
-      return u.toLowerCase()
-        .replace(/[?#].*$/, '')
-        .replace(/\/+$/, '');
-    }
+    return u ? u.toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '') : '';
+  }
+
+  function identityKey(rec) {
     return [rec.company, rec.title, rec.location].map(function (p) {
       return String(p || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
     }).join('|');
+  }
+
+  function dedupKey(rec) {
+    return urlKey(rec) || identityKey(rec);
+  }
+
+  /* Both keys, so a row matches on either.
+
+     The URL alone was not enough. The same posting reaches us from the employer
+     board on Monday and from an aggregator on Tuesday under a different URL, and
+     the agent has no memory of which board it used yesterday. With a URL-only
+     key that imported as a second row at status new, which put a role she had
+     already applied to straight back in the daily list and quietly defeated
+     rule 2. Matching company plus title plus location as well closes it. */
+  function keysOf(rec) {
+    var out = [];
+    var u = urlKey(rec);
+    if (u) out.push(u);
+    var i = identityKey(rec);
+    if (i && i !== '||') out.push(i);
+    return out;
   }
 
   function hashId(str) {
@@ -182,7 +202,9 @@
   function merge(rows) {
     var today = todayISO();
     var byKey = {};
-    board.forEach(function (r, i) { byKey[dedupKey(r)] = i; });
+    board.forEach(function (r, i) {
+      keysOf(r).forEach(function (k) { byKey[k] = i; });
+    });
 
     var added = 0, updated = 0, rejected = [], warnings = [];
 
@@ -196,7 +218,11 @@
 
       var rec = v.rec;
       var key = dedupKey(rec);
-      var at = byKey[key];
+      var at;
+      keysOf(rec).some(function (k) {
+        if (byKey[k] !== undefined) { at = byKey[k]; return true; }
+        return false;
+      });
 
       if (at === undefined) {
         board.push({
@@ -209,7 +235,7 @@
           signal: rec.signal, resume_tailored: rec.resume_tailored,
           status: rec._status, hidden: rec._hidden, notes: rec._notes
         });
-        byKey[key] = board.length - 1;
+        keysOf(rec).forEach(function (k) { byKey[k] = board.length - 1; });
         added++;
       } else {
         var cur = board[at];
@@ -300,12 +326,24 @@
     var todays = visible().filter(function (r) { return r.last_seen === latest; });
     el['latest-count'].textContent = todays.length;
 
+    /* "Best opportunity today" is a recommendation, so it has to respect the
+       same rule the daily list does: a role she has already applied to is not
+       something to do today. Without this the hero card kept recommending a
+       role every morning after she had actioned it, while the list below
+       correctly omitted it, which is rule 2 in CLAUDE.md leaking.
+
+       Fall back to the whole pool when everything is actioned, so the card
+       says something true rather than going blank, and label it. */
     var pool = todays.length ? todays : visible();
-    var best = pool.slice().sort(function (a, b) { return b.score - a.score; })[0];
+    var actionable = pool.filter(function (r) { return DONE.indexOf(r.status) === -1; });
+    var best = (actionable.length ? actionable : pool)
+      .slice().sort(function (a, b) { return b.score - a.score; })[0];
     if (best) {
       el['best-company'].textContent = best.company;
       el['best-meta'].textContent = [best.title, best.location || best.remote,
-                                    best.score + ' match score'].filter(Boolean).join(' · ');
+                                    best.score + ' match score',
+                                    DONE.indexOf(best.status) === -1 ? '' : 'already ' + best.status]
+                                    .filter(Boolean).join(' · ');
     } else {
       el['best-company'].textContent = 'Nothing imported yet';
       el['best-meta'].textContent = 'Import a digest to see the day’s top match.';
@@ -579,13 +617,29 @@
     });
 
     document.getElementById('import-run').addEventListener('click', function () {
+      /* Strip a markdown code fence if one came along for the ride. The digest
+         puts the array in a fenced block, and a phone mail client renders the
+         fence as literal backticks, so the likeliest paste in the whole system
+         is one with ```json on the front. Failing that with "unexpected token"
+         would break the only manual step in the pipeline, before work, on a
+         phone. Also tolerate leading prose up to the first bracket. */
+      var raw = txt.value.trim()
+        .replace(/^```[a-z]*\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+      var firstBracket = raw.search(/[[{]/);
+      if (firstBracket > 0) raw = raw.slice(firstBracket);
+
       var parsed;
       try {
-        parsed = JSON.parse(txt.value);
+        parsed = JSON.parse(raw);
       } catch (err) {
         report.hidden = false;
         report.className = 'dlg-report bad';
-        report.innerHTML = '<b>That is not valid JSON.</b><br>' + esc(err.message);
+        report.innerHTML = '<b>That is not valid JSON.</b><br>' + esc(err.message) +
+          '<br>Paste just the array, from the first <code>[</code> to the last ' +
+          '<code>]</code>. A code fence or any surrounding text is fine, but a ' +
+          'truncated copy is not, and a phone will often cut the end off.';
         return;
       }
       if (!Array.isArray(parsed)) parsed = [parsed];

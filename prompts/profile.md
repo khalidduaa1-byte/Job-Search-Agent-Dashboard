@@ -33,10 +33,14 @@ failure this whole pipeline exists to avoid.
 **1. Work authorization. F-1.** No employer sponsorship is needed for CPT or OPT, but
 authorization is **timing-gated**:
 
-- Summer 2026 and Fall 2026 starts are effectively impossible. Do not emit them.
 - The clean CPT window is **summer 2027**, after one full academic year.
 - **Full-time roles: target start dates on or after May 2027.** Internships: summer 2027.
-- A posting whose start date is before that is **out of scope, not a low score**.
+- A posting that **states** a start date before that is **out of scope, not a low score**. A stated
+  Summer or Fall 2026 start is not a record at all.
+- A posting that **states no start date** is a different case, and it is most of them. Presume an
+  immediate start, emit it, and take the 25-point deduction in `scoring-rubric.md`. It is worth
+  knowing about and worth a conversation. It is not something to apply to, and it must never be the
+  day's top pick.
 - Long term she will need H-1B or equivalent. So when a posting asks about sponsorship, the answer
   is honest rather than optimistic. Do not apply a cap for a posting that is merely silent on
   sponsorship, and do not raise the subject where the posting does not.

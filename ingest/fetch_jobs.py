@@ -102,10 +102,15 @@ deployment posting says "no coding screen" precisely to distinguish itself from
 the engineering flavour, so a blind matcher penalises the posting we want most
 and ranks the trap above it.
 """
-NEGATORS = ("no", "not", "never", "without", "zero", "none", "free", "avoid",
-            "excludes", "excluding", "skip", "unlike", "aren't", "arent",
+NEGATORS = ("no", "not", "never", "without", "zero", "none",
+            "excludes", "excluding", "aren't", "arent",
             "isn't", "isnt", "don't", "dont", "doesn't", "doesnt", "won't",
             "wont")
+
+# "free" was in this list and had to come out: "benefits include free lunch" and
+# "risk-free" then negated whatever followed. "avoid", "skip" and "unlike" went
+# for the same reason. A negator has to be one that reliably negates the thing
+# immediately after it.
 
 # How far back to look for a negator. Wide enough for "there is no ... " and
 # "we do not run a ...", tight enough that a negation two sentences earlier
@@ -406,7 +411,12 @@ def prescore(rec, rubric):
     # canada), so scanning only title plus description meant a London posting
     # with a clean description took no penalty at all and scored like a US one.
     # That is the single most important filter in the deterministic path.
-    penalty_blob = blob + " " + where
+    # Joined with a full stop, not a space. mentions() looks back 40 characters
+    # for a negator and stops at sentence punctuation, so a space here let the
+    # tail of the description reach forward into the location: a London posting
+    # ending "No agencies" had its out-of-scope penalty silenced and scored 45
+    # instead of 0. "No agencies" is near-universal posting boilerplate.
+    penalty_blob = blob + " . " + where
 
     for neg in rubric["penalties"]:
         # Negation-aware, and it matters most here. "There is no coding screen"

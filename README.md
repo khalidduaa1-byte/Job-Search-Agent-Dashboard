@@ -172,10 +172,13 @@ pipeline leaves the machine it was entered on, and that is a real tradeoff rathe
 - **The stat row** is four derived counts. Their definitions, so the numbers are auditable:
   - `ROLES IN VIEW`: every row not hidden
   - `90+ MATCH`: not hidden, score 90 or above
-  - `APPLIED TO`: status is applied, interviewing or offer
-  - `IN PROGRESS`: status is saved, applied, interviewing or offer, excluding hidden
-  - These count the whole board, so `ROLES IN VIEW` stays larger than the daily list. The list
-    shows what is left to action; the tiles show where the search actually stands.
+  - `APPLIED TO`: not hidden, status is applied, interviewing or offer
+  - `IN PROGRESS`: not hidden, status is saved, applied, interviewing or offer
+  - **All four count every row that is not hidden**, not the whole board: a hidden role is out of
+    all four. So `ROLES IN VIEW` stays larger than the daily list, because the list shows only what
+    is left to action while the tiles show where the search stands. Hiding a role therefore moves
+    the numbers, which is intended, and is why hidden roles stay visible in the right rail with a
+    count of their own.
 - **Apply is in the row**, not behind the fold. One click, new tab, straight to the
   application. Clicking it does not expand the row.
 - **Applied roles leave the daily list.** `Mark as applied` moves a role into the pipeline card,
@@ -193,7 +196,21 @@ pipeline leaves the machine it was entered on, and that is a real tradeoff rathe
 - **Hiding** moves a ruled-out role into `Hidden roles` in the right rail, with a `Restore`
   button. It is never deleted, and it stays in the export, so a decision is recoverable.
 - **Notes** per row, for call prep and who you spoke to.
-- **Export** downloads the whole board as JSON, hidden rows included.
+- **The board fills itself.** The daily task commits its digest to `data/digests/`, and the board
+  imports any digest it has not seen on load. Routine runs, deploy updates, she opens the site and the
+  roles are there. No paste.
+  - Everything goes through the same `merge()` as a manual paste, so an automatic import cannot break a
+    guarantee a manual one keeps: triage survives, applied roles do not return, dedup applies.
+  - A ledger of imported digest dates lives in `localStorage` under `jsd.digests.v1`, which is what
+    makes it safe to run on every load. A re-import would bump `last_seen` on every row and make
+    week-old roles look like they arrived today, so a reload must be, and is, a no-op.
+  - `first_seen` comes from the digest's own date, not the day it was read, so importing Monday's
+    digest on Wednesday still records Monday.
+  - It degrades quietly. No index, no network, or the page opened as a file all mean the same thing:
+    nothing to import, board still fully usable. **Import digest** remains the fallback and the way to
+    restore a backup.
+- **Export** downloads the whole board as JSON, hidden rows included, with the date it was taken
+  inside the file so the Friday roundup can say how fresh its input is.
 - **Agent brief** copies the one thing the scheduled task cannot work out for itself: what she has
   already applied to or hidden, and what is still unactioned at 90 plus. The task has no read path to
   this board and never will, because there is no server, so without the brief it re-emits roles she

@@ -222,6 +222,11 @@ rationale and on the resume.
 
 **1. Beauty Advisor Sales Tracker.** Strongest of the three, lead with this one.
 `sales-management-phi-blue.vercel.app`, source at `github.com/khalidduaa1-byte/Sales_management`.
+**18 and 20 count different things, and they are not additive.** 18 is the number of advisors the
+tracker went live with. Roughly 20 is the number of field users she onboarded and trained. They
+overlap and neither is a total, so never add them, never write "38", and never imply two separate
+rollouts. If one sentence needs both, say what each counts.
+
 A PWA and ingest pipeline shipped to **18 beauty advisors across Cairo, Sharm and Hurghada** for
 Dolce and Gabbana, replacing manual Excel-based sales reporting. Python and Supabase. The pipeline
 de-duplicates the supervisor export on advisor plus date plus store plus shift before any KPI is
@@ -235,17 +240,28 @@ to make the case for keeping the work in house.
 
 **2. Move-Out Sale site and tracker.** One Python script produces the buyer-facing catalog and the
 internal profit tracker from a single item list, so the listing and the accounting cannot disagree.
-20 of 31 items sold in 30 days, AED 8,400 recovered against AED 10,688 paid, a **78.6% recovery
-rate**.
+20 of 31 items sold in 30 days, AED 8,400 recovered against AED 10,688 paid **for those items**, a
+**78.6% recovery rate**.
+
+**The caveat is part of the number.** 78.6% is recovery against what was paid for the items that
+sold. It is **not** recovery against total apartment spend, and it is not a recovery rate on the
+whole move-out. Written without "for those items" it reads as the larger claim, which is the kind of
+figure that unravels on the first follow-up question.
 
 **3. Homebase.** `homebase-labs.lovable.app`. Hackathon property management build, co-founded with
-her husband, 2 person team. **What shipped: a CRUD app over six Firestore collections**, plus the
+her husband, **a two person team in which the other founder is a professional engineer.** Say that
+plainly wherever the build is described. Without it, "co-founded and shipped a CRUD app" reads as
+solo engineering work, which is the claim most likely to be probed and the one she cannot defend. **What shipped: a CRUD app over six Firestore collections**, plus the
 product scope end to end and the Firestore data model. Next.js, React, Tailwind, Firebase.
 
 - The **RERA, WhatsApp and AI-agent layer was vision, explicitly out of MVP scope.** Do not
   describe it as built, live, or a product, and never attach production metrics to it.
-- What is worth saying is the **design decision**: deterministic template as the default, the model
-  path behind an opt-in flag. That is a judgment call worth describing on its own terms.
+- **Do not write "owned the UAE rental regulation model".** That claim came off the resume
+  deliberately. What shipped was CRUD over six Firestore collections; the regulation layer was the
+  part that did not ship, so owning a model of it does not survive a follow-up question.
+- What is worth saying instead is the **design decision**: deterministic template as the default with
+  the model behind an opt-in flag. That is a real engineering judgment call, it is defensible in
+  detail, and it says more about how she thinks than the regulation claim did.
 - No link to `github.com/bm2515/homebase`. It is the co-founder's private repo and it 404s for
   every visitor. Use the live link above.
 

@@ -102,8 +102,18 @@ while chasing a feature.
 
 ## The loop is open in one direction, and that is the interesting constraint
 
-The agent can write to the board, via a digest she pastes. **The board cannot write back**, because
-there is no server. Everything the scheduled task gets wrong on a repeat morning traces to this:
+The agent writes to the board by **committing its digest to `data/digests/`**, which the board imports
+on load. That closes the outbound half without a server: the routine pushes, the deploy updates, and
+the board fills itself. `data/digests/index.json` exists because a browser cannot list a directory, and
+the ledger in `localStorage` under `jsd.digests.v1` is what stops a reload re-importing and bumping
+`last_seen` on the whole board.
+
+Auto-import goes through the same `merge()` as a paste, deliberately. That is where triage
+preservation, the dedup keys and the applied-does-not-return filter live, so there must never be a
+second import path.
+
+**The board still cannot write back.** Everything the scheduled task gets wrong on a repeat morning
+traces to that remaining half:
 
 - it re-emits a role she applied to, because it cannot see that she did
 - it re-sells a role she deliberately hid, which reads as the search not listening

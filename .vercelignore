@@ -1,0 +1,31 @@
+# What the deploy must NOT serve.
+#
+# Vercel has no build step here, so every file in the deployed directory is
+# fetchable at its path. Repo visibility is irrelevant to that: a private repo
+# still serves a public site. So anything sensitive has to be excluded here, not
+# hidden on GitHub.
+#
+# The live exposure this closes: prompts/profile.md states her F-1 status and
+# visa timing, a $2.5M book of business, and a candid note that her depth under
+# technical questioning is thinner than her communication. The resume PDF carries
+# her mobile number. All of it was readable at a guessable URL.
+prompts/
+resume/
+tests/
+ingest/
+schema/
+
+# Docs. Nothing on the site links them and they describe the internals.
+CLAUDE.md
+CONTRACT.md
+SOURCES.md
+designprompt.md
+package.json
+
+# NOT ignored, because the board fetches them at runtime:
+#   index.html, styles.css, app.js
+#   data/sample-opportunities.json, data/sample-digest.json   (Load sample data)
+#   data/digests/                                             (auto-import)
+#
+# README.md is left served on purpose: it is the project's public face and
+# contains nothing about her that she has not chosen to publish.

@@ -32,13 +32,12 @@ Python
 homebase-labs.lovable.app
 Next.js, React, Tailwind, Firebase/Firestore
 
-- Co-founded and defined product scope end to end, shipping a CRUD app over six Firestore
-  collections with the data model and dashboard flows.
-- Owned the UAE rental regulation model the product was designed around, covering RERA bands, the
-  90 day notice rule, Ejari sequencing and the bilingual EN/AR requirement. The RERA, WhatsApp and
-  agent automation layer was scoped as vision and explicitly out of the MVP.
-- Chose a deterministic template as the default path with the model behind an opt-in flag, so the
-  product's behaviour stayed predictable where correctness mattered.
+- Co-founded with one other founder, a professional engineer, and defined product scope end to end,
+  shipping a CRUD app over six Firestore collections with the data model and dashboard flows.
+- Chose a deterministic template as the default path with the model behind an opt-in flag, keeping
+  the product's behaviour predictable where correctness mattered and reserving the model for where it
+  added something. The RERA, WhatsApp and agent automation layer was scoped as vision and explicitly
+  outside the MVP.
 
 ## Experience
 

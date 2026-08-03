@@ -146,6 +146,32 @@ Body, in this order:
 5. **The JSON block**, exactly as specified below, under a heading that says
    `Paste into the dashboard`.
 
+## 5b. Publish the digest so the board can collect it
+
+The board cannot be written to from outside: it is `localStorage` and there is no server. So the
+digest is **committed to this repo**, and the board imports it on load. That is what makes the site
+fill itself instead of waiting for a paste.
+
+**This is a deliberate, narrow exception to "do not modify or commit any code", and it is scoped to
+`data/digests/` only.** Nothing else in the repo may be touched, no prompt, no app file, no resume.
+
+1. Write `data/digests/<YYYY-MM-DD>.json` containing **only the JSON array**. No fence, no prose, no
+   wrapper object. It has to parse as-is, because the board fetches it directly.
+2. Add that date to the front of the `digests` array in `data/digests/index.json`. **The index is not
+   optional**: a browser cannot list a directory, so without it the board has no way to discover the
+   file you just wrote.
+3. Commit both, and push.
+
+Use today's date, the date of the digest, not the date anyone might read it. The board stamps
+`first_seen` from the filename, so a wrong date makes an old role look like it arrived this morning.
+
+If you cannot push, **say so in one line and carry on**. The digest is still in your response and she
+can paste it by hand, so a failed push is a degraded morning rather than a lost one. Do not retry in
+a loop and do not force anything.
+
+Keep the JSON block in your response as well, even when the push succeeds. It is the fallback when
+the deploy is slow, and it costs nothing.
+
 Keep the prose short. She reads this on a phone before work.
 
 ## 6. Emit the JSON

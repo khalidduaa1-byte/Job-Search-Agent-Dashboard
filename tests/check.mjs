@@ -579,6 +579,100 @@ const narrow = await frame.evaluate((f) => {
 });
 eq('no horizontal overflow at 390px', narrow.scroll, narrow.client);
 
+/* -- resume_tailored is not sticky --------------------------------
+   The agent emits this boolean on every record, so or-ing it with the existing
+   value meant that once true it was true forever: Monday tailored a resume,
+   Tuesday did not, and the row still claimed one had been sent. The badge then
+   accumulates across the week and stops meaning "today's". */
+console.log('\nresume_tailored');
+await reset(page);
+const tailoredRow = {
+  title: 'Tailored Today', company: 'Badge Test Co', location: 'New York, NY',
+  remote: 'hybrid', source: 'greenhouse', url: 'https://example-boards.test/badge/1',
+  apply_url: 'https://example-boards.test/badge/1', posted: '2026-08-01',
+  score: 95, rationale: 'Top pick, so a resume was tailored for it.',
+  signal: 'employer board page active', resume_tailored: true
+};
+await importJSON(page, [tailoredRow]);
+eq('resume_tailored lands true', (await board(page)).find((r) => r.company === 'Badge Test Co').resume_tailored, true);
+await importJSON(page, [Object.assign({}, tailoredRow, { resume_tailored: false })]);
+eq('and a later digest that did not tailor clears it',
+  (await board(page)).find((r) => r.company === 'Badge Test Co').resume_tailored, false);
+
+/* -- Auto-import from a published digest ---------------------------
+   The board cannot be written to from outside, so the daily routine commits its
+   digest to the repo and the board picks it up on load. That is what makes the
+   site fill itself, and these are the assertions that make it safe to run on
+   every single page load.
+
+   Needs a separate origin serving data/digests, since the repo's own index is
+   empty by design. AUTO_BASE points at it; without it these checks are skipped
+   rather than silently passing. */
+console.log('\nAuto-import');
+if (!process.env.AUTO_BASE) {
+  console.log('  skip  set AUTO_BASE to a site serving data/digests to run these');
+} else {
+  const AUTO = process.env.AUTO_BASE;
+  const seenDates = (pg) => pg.evaluate(() =>
+    JSON.parse(localStorage.getItem('jsd.digests.v1') || '{"seen":[]}').seen);
+
+  const auto = await browser.newPage();
+  await auto.goto(AUTO, { waitUntil: 'domcontentloaded' });
+  await auto.waitForTimeout(1200);
+
+  eq('a published digest imports itself with no paste', (await board(auto)).length, 3);
+  ok('and the toast says what it did',
+    /Imported .*3 added/.test(await auto.textContent('#toast')),
+    await auto.textContent('#toast'));
+  /* The ledger key is date PLUS a content hash, not the date alone. Keyed on date
+     only, a corrected digest could never land: a re-fired routine rewrites
+     today's file, the ledger already holds today's date, and the board skips it
+     forever. */
+  const ledger = await seenDates(auto);
+  eq('one digest recorded in the ledger', ledger.length, 1);
+  ok('and the key carries a content hash, not just the date',
+    /^2026-07-30:op_[a-z0-9]+$/.test(ledger[0]), JSON.stringify(ledger));
+  /* first_seen has to come from the digest, not the day it was read. The jobs
+     chip counts arrivals by first_seen, so stamping today would make a week-old
+     row look like it turned up this morning. */
+  ok('first_seen comes from the digest date, not today',
+    (await board(auto)).every((r) => r.first_seen === '2026-07-30'),
+    JSON.stringify((await board(auto)).map((r) => r.first_seen)));
+
+  /* The assertion that matters most: a re-import bumps last_seen on every row,
+     which is silent and cumulative, so a reload must be a no-op. */
+  const beforeReload = await board(auto);
+  await auto.reload({ waitUntil: 'domcontentloaded' });
+  await auto.waitForTimeout(1200);
+  eq('a reload does not re-import', (await board(auto)).length, 3);
+  eq('and does not touch last_seen',
+    (await board(auto)).map((r) => r.last_seen).sort(),
+    beforeReload.map((r) => r.last_seen).sort());
+  eq('the ledger still holds exactly one entry', (await seenDates(auto)).length, 1);
+
+  /* Triage must survive an auto-import exactly as it survives a paste. */
+  await auto.locator('.row').first().locator('summary').click();
+  await auto.locator('.row').first().locator('[data-act="applied"]').click();
+  await auto.waitForTimeout(80);
+  const appliedId = (await board(auto)).find((r) => r.status === 'applied').id;
+  await auto.reload({ waitUntil: 'domcontentloaded' });
+  await auto.waitForTimeout(1200);
+  eq('an applied status survives a reload with auto-import armed',
+    (await board(auto)).find((r) => r.id === appliedId).status, 'applied');
+  ok('and the applied role is not back in the daily list',
+    !(await rowIds(auto)).includes(appliedId));
+
+  /* A malformed index must leave the board usable. Offline, a missing file and
+     a local file:// open all land here, and none of them is an error state. */
+  await auto.goto(AUTO + '/?broken=1', { waitUntil: 'domcontentloaded' });
+  await auto.route('**/data/digests/index.json*', (r) => r.fulfill({ body: 'not json' }));
+  await auto.reload({ waitUntil: 'domcontentloaded' });
+  await auto.waitForTimeout(1000);
+  eq('a malformed index leaves the board intact', (await board(auto)).length, 3);
+  ok('and the page still works', await auto.isVisible('.row'));
+  await auto.close();
+}
+
 await browser.close();
 
 console.log(`\n${pass} checks passed, ${fails.length} failed`);

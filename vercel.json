@@ -1,3 +1,12 @@
 {
-  "cleanUrls": true
+  "cleanUrls": true,
+  "headers": [
+    {
+      "_comment": "The digest index and the digests must never be served stale. Without this the CDN happily hands back this morning's index from before the routine committed: she opens the site at 08:05, the digest landed at 08:00, the board shows nothing, and it reads as broken code rather than a cache. The digest files themselves are immutable once written, but a corrected re-push has to win, so no-store applies to both.",
+      "source": "/data/digests/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0, must-revalidate" }
+      ]
+    }
+  ]
 }

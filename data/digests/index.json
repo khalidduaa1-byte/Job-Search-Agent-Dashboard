@@ -1,0 +1,11 @@
+{
+  "_comment": [
+    "The digest index. The board reads this on load, then fetches each digest it",
+    "has not already imported. It exists because a browser cannot list a directory",
+    "and neither can raw.githubusercontent.com, so without an index the board has",
+    "no way to discover what the routine wrote.",
+    "The daily routine appends a date here and commits data/digests/<date>.json",
+    "alongside it. Newest first. Keep this file small: it is fetched on every load."
+  ],
+  "digests": []
+}

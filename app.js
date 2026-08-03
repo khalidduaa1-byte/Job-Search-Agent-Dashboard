@@ -13,6 +13,7 @@
   'use strict';
 
   var KEY = 'jsd.board.v1';
+  var SEEN_KEY = 'jsd.digests.v1';
   var STATUSES = ['new', 'saved', 'applied', 'interviewing', 'offer', 'closed'];
   var REMOTES = ['onsite', 'hybrid', 'remote', 'unknown'];
   var PIPELINE = ['saved', 'applied', 'interviewing', 'offer'];
@@ -186,6 +187,52 @@
     }
   }
 
+  /* The ledger of digests already auto-imported.
+
+     This is the whole reason auto-import is safe to run on every page load. A
+     re-import bumps last_seen on every row it touches, which makes rows that
+     arrived on Monday look like they arrived today, and that is exactly the
+     staleness the jobs chip and the no-JSON-on-Friday rule exist to prevent. So
+     the board records which digest dates it has consumed and never consumes one
+     twice, however many times the page is opened.
+
+     Kept separate from the board key rather than inside it, so importing an
+     export or restoring a backup cannot carry another browser's ledger across
+     and silently skip digests this browser has never seen.
+
+     Keyed on the date AND a hash of the content, not the date alone. Keying on
+     date meant a corrected digest could never land: if a routine re-fired and
+     rewrote today's file, the ledger already held today's date and the board
+     skipped it forever. The hash keeps the idempotency, since unchanged content
+     produces the same key, while letting an amendment through. */
+  function importedDigests() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(SEEN_KEY));
+      return raw && Array.isArray(raw.seen) ? raw.seen : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function digestKey(date, rows) {
+    return date + ':' + hashId(JSON.stringify(rows));
+  }
+
+  function recordImported(key) {
+    var seen = importedDigests();
+    if (seen.indexOf(key) !== -1) return;
+    seen.push(key);
+    /* Keep the tail rather than growing without bound. Two per weekday is
+       generous for anything the board needs to remember. */
+    if (seen.length > 60) seen = seen.slice(seen.length - 60);
+    try {
+      localStorage.setItem(SEEN_KEY, JSON.stringify({ version: 2, seen: seen }));
+    } catch (e) {
+      /* Out of quota. Say nothing here: save() already warns, and the cost is a
+         duplicate import next load rather than lost data. */
+    }
+  }
+
   /* Validation ----------------------------------------------------------
      Forgiving but loud. A row is rejected only when the board cannot
      function without the field. Everything else is coerced and reported,
@@ -264,9 +311,14 @@
     return { ok: true, rec: rec, warnings: warnings };
   }
 
-  /* Merge ---------------------------------------------------------- */
-  function merge(rows) {
-    var today = todayISO();
+  /* Merge ----------------------------------------------------------
+     `asOf` is the date the digest was produced, and it defaults to today so the
+     manual paste path behaves exactly as it did. Auto-import passes the digest's
+     own date, because importing Monday's digest on Wednesday must stamp Monday:
+     first_seen is what the jobs chip counts arrivals by, and getting it wrong
+     makes an old row look like it turned up today. */
+  function merge(rows, asOf) {
+    var today = /^\d{4}-\d{2}-\d{2}$/.test(asOf) ? asOf : todayISO();
     var byKey = {};
     board.forEach(function (r, i) {
       keysOf(r).forEach(function (k) { byKey[k] = i; });
@@ -337,7 +389,13 @@
         cur.band = rec.band;
         cur.rationale = rec.rationale || cur.rationale;
         cur.signal = rec.signal || cur.signal;
-        cur.resume_tailored = rec.resume_tailored || cur.resume_tailored;
+        /* Assigned, not or-ed. The agent emits this boolean on every record, so
+           `rec || cur` meant that once true it was true forever: Monday tailored
+           a resume, Tuesday did not, and the row still claimed one had been sent.
+           The badge then accumulates across the week and stops meaning "today's".
+           Unlike url and rationale below, false here is a real value rather than
+           a missing one. */
+        cur.resume_tailored = rec.resume_tailored;
         cur.last_seen = today;
         updated++;
       }
@@ -891,11 +949,106 @@
     });
   }
 
+  /* Auto-import --------------------------------------------------------
+     The board cannot be written to from outside, because it is localStorage and
+     there is no server. So the daily task commits its digest to the repo instead,
+     and the board picks it up here on load. That is what makes the site fill
+     itself: the routine pushes, the deploy updates, she opens the page and the
+     roles are there.
+
+     Everything goes through merge(), deliberately. That is where the dedup keys,
+     the triage-preservation rule and the applied-does-not-return filter live, so
+     routing auto-import through it means an automatic import cannot break a
+     guarantee that a manual paste keeps. Do not add a second import path.
+  ------------------------------------------------------------------- */
+  function autoImport() {
+    /* no-store on every fetch here, and vercel.json sets the same header. A
+       stale index served by the CDN hides this morning's digest completely, and
+       that failure looks exactly like broken code rather than a cache. A digest
+       is fetched fresh too, so a corrected re-push wins. */
+    return fetch('data/digests/index.json', { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (index) {
+        var dates = (index && Array.isArray(index.digests)) ? index.digests : [];
+        var seen = importedDigests();
+        /* Oldest first, so first_seen lands in the order the digests were
+           produced rather than the order the index happens to list them. Every
+           date is fetched, because whether it has been imported depends on the
+           content hash and that is not knowable from the index. */
+        var todo = dates.filter(function (d) {
+          return /^\d{4}-\d{2}-\d{2}$/.test(d);
+        }).sort();
+
+        if (!todo.length) return null;
+
+        return todo.reduce(function (chain, date) {
+          return chain.then(function (acc) {
+            return fetch('data/digests/' + date + '.json', { cache: 'no-store' })
+              .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+              })
+              .then(function (rows) {
+                if (!Array.isArray(rows)) throw new Error('not an array');
+                var key = digestKey(date, rows);
+                if (seen.indexOf(key) !== -1) return acc;
+                var res = merge(rows, date);
+                recordImported(key);
+                acc.push({ date: date, res: res });
+                return acc;
+              })
+              .catch(function (err) {
+                /* One bad digest must not block the others, and must not be
+                   recorded as imported, so tomorrow's load retries it. */
+                acc.push({ date: date, error: err.message });
+                return acc;
+              });
+          });
+        }, Promise.resolve([]));
+      });
+  }
+
+  function reportAutoImport(results) {
+    if (!results || !results.length) return;
+    var ok = results.filter(function (r) { return r.res; });
+    var bad = results.filter(function (r) { return r.error; });
+
+    if (ok.length) {
+      var added = ok.reduce(function (n, r) { return n + r.res.added; }, 0);
+      var updated = ok.reduce(function (n, r) { return n + r.res.updated; }, 0);
+      var rejected = ok.reduce(function (n, r) { return n + r.res.rejected.length; }, 0);
+      /* Say what happened. An import that arrives in silence is
+         indistinguishable from one that never ran, which was the whole problem
+         with an empty board that gave no account of itself. */
+      toast('Imported ' + (ok.length === 1 ? prettyDate(ok[0].date) : ok.length + ' digests') +
+            ': ' + added + ' added, ' + updated + ' updated' +
+            (rejected ? ', ' + rejected + ' rejected' : '') + '.');
+    }
+    if (bad.length) {
+      toast('Could not read ' + bad.length + ' digest' + (bad.length === 1 ? '' : 's') +
+            ' (' + bad[0].date + ': ' + bad[0].error + '). It will be retried next time.');
+    }
+  }
+
   /* Boot ----------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
     cache();
     load();
     wire();
     render();
+
+    /* Last, and never blocking the first paint. No index, no network, or the
+       page opened as a file all mean the same thing here: nothing to import.
+       The board must stay fully usable in all three cases, so this failure is
+       deliberately quiet, exactly as Load sample data already is. */
+    autoImport()
+      .then(function (results) {
+        if (results && results.length) render();
+        reportAutoImport(results);
+      })
+      .catch(function () { /* no digests published, or offline */ });
   });
 })();

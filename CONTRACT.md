@@ -43,7 +43,10 @@ The exact twelve: `title`, `company`, `location`, `remote`, `source`, `url`, `ap
 
 This split is the whole design.
 
-- **The agent owns** `title` through `signal`, plus `resume_tailored`. It may overwrite these on
+- **The agent owns** `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`,
+  `posted`, `score`, `rationale`, `signal` and `resume_tailored`. Named rather than given as a range,
+  because "`title` through `signal`" spanned `first_seen` and `last_seen` in the table above and so
+  contradicted the dashboard-owned line below it. It may overwrite these on
   every import.
 - **The human owns** `status`, `hidden` and `notes`. The agent must never emit a value for these
   that overwrites a decision already made. If it emits them at all they are treated as defaults
@@ -77,6 +80,20 @@ Keep the human's state, refresh the agent's fields.
 | Row fails validation | Reject that row, report it, and import the rest |
 
 A rejected row is never partially applied.
+
+### One nuance in that update, which the code has and this table did not
+
+`url`, `apply_url`, `posted`, `rationale` and `signal` are overwritten **only when the incoming value
+is non-empty**. An agent that omits a rationale on Tuesday does not blank the one it wrote on Monday,
+because an empty field is almost always a gap in this morning's output rather than a statement that
+the old value was wrong.
+
+`score`, `band`, `title`, `company`, `location`, `remote` and `source` are assigned unconditionally,
+since the agent always emits them and a change is a real change.
+
+`resume_tailored` is also assigned unconditionally, and that is the point: it used to be or-ed with
+the existing value, so once true it stayed true forever and the "Tailored resume sent" badge
+accumulated across the week. `false` here is a real value, not a missing one.
 
 ## How strict validation actually is
 

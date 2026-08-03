@@ -62,8 +62,11 @@ Projects is not, and neither is reintroducing a summary.
 - **The LVMH tool's scope, if you state it at all.** Two direct users, her and one colleague; the
   ordering process it served covered 30 plus MENA locations; the 45 to 5 minutes is per order. Say
   those together or say the metric alone. Never imply 30 plus people used the tool.
+- **AED 10,688 is what was paid FOR THOSE ITEMS**, not total apartment spend. Keep "for those items"
+  or drop the figure. Without it the sentence claims a bigger recovery than happened.
 - **One derived figure is allowed**, the 78.6% recovery rate, because it is AED 8,400 over AED
-  10,688 and nothing else. Write it as 78.6% or not at all. No other percentage, ratio, average
+  10,688 and nothing else, and it carries the same caveat: recovery against what was paid for the
+  items that sold. Write it as 78.6% or not at all. No other percentage, ratio, average
   or annualised figure may be computed from the numbers above, however defensible the arithmetic
   looks, because a figure that is not in `profile.md` cannot be checked against anything.
 - **Job titles exactly as held, with no embellishment.** "Customer Success and Key Account

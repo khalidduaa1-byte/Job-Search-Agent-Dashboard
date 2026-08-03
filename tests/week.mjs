@@ -454,6 +454,17 @@ page.on('pageerror', (e) => { fails.push('uncaught page error: ' + e.message); }
    all beyond the file it was served from. */
 await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
 
+/* The digest path is embedded in app.js, so this origin's own published digests
+   auto-import on every one of the eleven loads below and land on top of the
+   synthetic week. That is not a simulation of anything: the board starts at
+   nineteen rows it never imported, every tile and every count is off by them,
+   and the failures read as a merge fault rather than as the fixtures being
+   drowned. The week under test is the one this file writes, so stub the path
+   out. Auto-import has its own assertions in tests/check.mjs, against a fixture
+   digest on a separate origin, which is the only place it belongs. */
+await page.route('**/data/digests/**', (route) =>
+  route.fulfill({ status: 404, body: '' }).catch(() => {}));
+
 await installClock(page);
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear());

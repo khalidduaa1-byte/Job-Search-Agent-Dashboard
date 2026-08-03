@@ -62,18 +62,36 @@ async function reset(page) {
    browsers directory as usual. */
 const browser = await chromium.launch(
   process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
-const page = await browser.newPage();
-page.on('pageerror', (e) => { fails.push('uncaught page error: ' + e.message); });
 
 /* The digest path is embedded in app.js now, so this origin's own published
-   digests would auto-import into every assertion below and the suite would
-   measure whatever the routine last committed. A fresh board would not be empty
-   and the stat tiles would not be zero, which is exactly how this first broke.
+   digests auto-import into every assertion below unless they are stubbed out,
+   and the suite would measure whatever the routine last committed. A fresh board
+   would not be empty and the stat tiles would not be zero, which is exactly how
+   this first broke.
 
-   So stub the path out here. Auto-import is asserted properly further down, on
-   its own pages against AUTO_BASE and a fixture digest, which is the only place
-   that behaviour should be under test. */
-await page.route('**/data/digests/**', (r) => r.fulfill({ status: 404, body: '' }));
+   So every page that talks to BASE is made here, with the path stubbed. Use this
+   rather than browser.newPage(): a section that opens its own page and forgets
+   the stub imports the real twenty-row digest on top of its own fixture, and
+   fails with counts that look like a code fault rather than a stale test.
+
+   The Auto-import section is the one deliberate exception. It opens its pages
+   against AUTO_BASE with no stub, because a fixture digest actually arriving is
+   the behaviour it exists to assert. */
+async function stubbedPage() {
+  const p = await browser.newPage();
+  p.on('pageerror', (e) => { fails.push('uncaught page error: ' + e.message); });
+  /* Swallow the rejection. A digest fetch can still be in flight when the
+     section closes its page, and fulfilling into a closed target rejects with
+     "Target page, context or browser has been closed". Nothing awaits a route
+     handler, so on Node that is an unhandled rejection and it takes the whole
+     run down mid-section, which reads as a crash in whichever section happened
+     to be next rather than as a teardown race. */
+  await p.route('**/data/digests/**', (r) =>
+    r.fulfill({ status: 404, body: '' }).catch(() => {}));
+  return p;
+}
+
+const page = await stubbedPage();
 
 /* -- Empty state ---------------------------------------------------- */
 console.log('\nEmpty state');
@@ -708,7 +726,18 @@ if (!process.env.AUTO_BASE) {
   ok('and the empty state is gone once rows land', !(await auto.isVisible('#empty')));
 
   /* The token arrives once in the hash, is kept, and is stripped from the
-     address bar so it does not sit in screenshots or browser history. */
+     address bar so it does not sit in screenshots or browser history.
+
+     Clear first. The load above has already imported the fixture and written it
+     to the ledger, so a second load is correctly a no-op: the board still holds
+     three rows and the toast correctly says nothing arrived. Asserting the
+     import on top of that measured the previous load rather than this one, and
+     read as the hash route being broken when it was working exactly as designed.
+     Each assertion starts from the state it actually needs.
+
+     The query string is not decoration. A hash-only navigation does not reload
+     the document, so DOMContentLoaded never fires and nothing runs. */
+  await auto.evaluate(() => localStorage.clear());
   await auto.goto(AUTO + '/?t=tok#k=gDvhEI011oXtnnDxKT9LkX5-lc7LCs84', { waitUntil: 'domcontentloaded' });
   await auto.waitForTimeout(1400);
   eq('the token is stripped from the visible URL',
@@ -835,7 +864,7 @@ if (!process.env.AUTO_BASE) {
    migrating back into the number. */
 console.log('\nFit versus actionability');
 {
-  const page = await browser.newPage();
+  const page = await stubbedPage();
   const base = (o) => Object.assign({
     title: 'Role', company: 'Co', location: 'New York, NY', remote: 'hybrid',
     source: 'greenhouse', url: '', apply_url: '', posted: '2026-08-01',
@@ -926,7 +955,7 @@ console.log('\nFit versus actionability');
    rejected looked exactly like a clean one. It is persisted now. */
 console.log('\nThe import record');
 {
-  const page = await browser.newPage();
+  const page = await stubbedPage();
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -980,7 +1009,7 @@ console.log('\nThe import record');
    Consultant" and a real second role left the board with nothing said. */
 console.log('\nSeniority does not merge');
 {
-  const page = await browser.newPage();
+  const page = await stubbedPage();
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded' });

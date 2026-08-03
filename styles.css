@@ -599,6 +599,21 @@ dialog::backdrop { background: rgba(26, 26, 26, 0.42); }
   border-radius: var(--radius-sm);
   resize: vertical;
 }
+/* The file route into the import dialog. A real label bound to a hidden input,
+   so it stays keyboard reachable and screen readers announce it. */
+.file-link {
+  color: var(--accent);
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+}
+.file-link:hover { border-bottom-color: var(--accent); }
+#import-file:focus-visible + .file-link,
+.file-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+dialog.dropping {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent-soft);
+}
+
 .dlg-report {
   margin-top: 12px;
   padding: 12px 14px;

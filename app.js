@@ -14,6 +14,46 @@
 
   var KEY = 'jsd.board.v1';
   var SEEN_KEY = 'jsd.digests.v1';
+  var TOKEN_KEY = 'jsd.token.v1';
+
+  /* The digest token, and what it does and does not protect.
+
+     Vercel serves every file in the tree, so digests committed to a fixed path
+     would publish which roles she is pursuing, which non-negotiable 8 forbids.
+     Putting them under a long random path segment means the URL is not
+     guessable, nothing links to it, and index.html already sends
+     noindex, nofollow.
+
+     Say the limit out loud: this is UNGUESSABLE, NOT AUTHENTICATED. Anyone who
+     obtains the URL can read the digests. It is strong against crawlers and
+     casual discovery and needs no backend, and her triage, which is the
+     genuinely sensitive half, never leaves localStorage either way. Real
+     authentication means Vercel deployment protection in front of the site,
+     which drops in without changing any of this.
+
+     The token arrives once as #k=<token>, is kept in localStorage, and is
+     stripped from the address bar so it does not sit in screenshots or history. */
+  function digestToken() {
+    var fromHash = /(?:^|[#&])k=([A-Za-z0-9_-]{16,})/.exec(location.hash || '');
+    if (fromHash) {
+      try { localStorage.setItem(TOKEN_KEY, fromHash[1]); } catch (e) { /* private mode */ }
+      /* Drop it from the visible URL without adding a history entry. */
+      if (window.history && history.replaceState) {
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+      return fromHash[1];
+    }
+    try {
+      return localStorage.getItem(TOKEN_KEY) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function digestPath(file) {
+    var t = digestToken();
+    return t ? 'data/digests/' + t + '/' + file : '';
+  }
   var STATUSES = ['new', 'saved', 'applied', 'interviewing', 'offer', 'closed'];
   var REMOTES = ['onsite', 'hybrid', 'remote', 'unknown'];
   var PIPELINE = ['saved', 'applied', 'interviewing', 'offer'];
@@ -888,6 +928,48 @@
       dlg.close();
     });
 
+    /* Read a digest file into the textarea, rather than importing it directly.
+       She still sees what she is about to merge and still presses the button, so
+       there is one import path and one confirmation step, not two. */
+    function loadFile(file) {
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        txt.value = String(reader.result || '');
+        report.hidden = false;
+        report.className = 'dlg-report ok';
+        report.innerHTML = 'Loaded <b>' + esc(file.name) + '</b>. Press ' +
+                           '<b>Validate and merge</b> to import it.';
+      };
+      reader.onerror = function () {
+        report.hidden = false;
+        report.className = 'dlg-report bad';
+        report.innerHTML = 'Could not read <b>' + esc(file.name) + '</b>.';
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('import-file').addEventListener('change', function (e) {
+      loadFile(e.target.files && e.target.files[0]);
+      e.target.value = '';
+    });
+
+    /* Drop anywhere on the dialog. dragover has to be prevented or the browser
+       navigates away to the dropped file and the board is simply gone. */
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      dlg.addEventListener(evt, function (e) {
+        e.preventDefault();
+        dlg.classList.add('dropping');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      dlg.addEventListener(evt, function () { dlg.classList.remove('dropping'); });
+    });
+    dlg.addEventListener('drop', function (e) {
+      e.preventDefault();
+      loadFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+
     document.getElementById('import-run').addEventListener('click', function () {
       /* Strip a markdown code fence if one came along for the ride. The digest
          puts the array in a fenced block, and a phone mail client renders the
@@ -962,11 +1044,17 @@
      guarantee that a manual paste keeps. Do not add a second import path.
   ------------------------------------------------------------------- */
   function autoImport() {
+    /* No token means no auto-import, and that is a normal state rather than an
+       error: anyone opening the site, or her on a device she has not bookmarked
+       yet, gets a board that works exactly as it did before. Say nothing. */
+    var index = digestPath('index.json');
+    if (!index) return Promise.resolve(null);
+
     /* no-store on every fetch here, and vercel.json sets the same header. A
        stale index served by the CDN hides this morning's digest completely, and
        that failure looks exactly like broken code rather than a cache. A digest
        is fetched fresh too, so a corrected re-push wins. */
-    return fetch('data/digests/index.json', { cache: 'no-store' })
+    return fetch(index, { cache: 'no-store' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -986,7 +1074,7 @@
 
         return todo.reduce(function (chain, date) {
           return chain.then(function (acc) {
-            return fetch('data/digests/' + date + '.json', { cache: 'no-store' })
+            return fetch(digestPath(date + '.json'), { cache: 'no-store' })
               .then(function (r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();

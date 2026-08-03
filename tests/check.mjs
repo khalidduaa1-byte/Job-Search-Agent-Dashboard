@@ -617,8 +617,23 @@ if (!process.env.AUTO_BASE) {
     JSON.parse(localStorage.getItem('jsd.digests.v1') || '{"seen":[]}').seen);
 
   const auto = await browser.newPage();
+
+  /* No token means no auto-import, and that is a normal state rather than an
+     error. Anyone opening the site, or her on a device she has not bookmarked,
+     must get a board that works exactly as it did before. */
   await auto.goto(AUTO, { waitUntil: 'domcontentloaded' });
-  await auto.waitForTimeout(1200);
+  await auto.waitForTimeout(900);
+  eq('without a token nothing is imported', (await board(auto)).length, 0);
+  ok('and the board still works', await auto.isVisible('#empty'));
+
+  /* The token arrives once in the hash, is kept, and is stripped from the
+     address bar so it does not sit in screenshots or browser history. */
+  await auto.goto(AUTO + '/?t=tok#k=gDvhEI011oXtnnDxKT9LkX5-lc7LCs84', { waitUntil: 'domcontentloaded' });
+  await auto.waitForTimeout(1400);
+  eq('the token is stripped from the visible URL',
+    await auto.evaluate(() => location.hash), '');
+  eq('and persisted for later loads',
+    await auto.evaluate(() => localStorage.getItem('jsd.token.v1')), 'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
 
   eq('a published digest imports itself with no paste', (await board(auto)).length, 3);
   ok('and the toast says what it did',
@@ -661,6 +676,15 @@ if (!process.env.AUTO_BASE) {
     (await board(auto)).find((r) => r.id === appliedId).status, 'applied');
   ok('and the applied role is not back in the daily list',
     !(await rowIds(auto)).includes(appliedId));
+
+  /* A wrong token must fail quietly, not error. */
+  await auto.evaluate(() => localStorage.setItem('jsd.token.v1', 'wrongtokenwrongtokenwrong'));
+  const beforeWrong = (await board(auto)).length;
+  await auto.reload({ waitUntil: 'domcontentloaded' });
+  await auto.waitForTimeout(1000);
+  eq('a wrong token imports nothing and breaks nothing', (await board(auto)).length, beforeWrong);
+  ok('the page still renders', await auto.isVisible('.row'));
+  await auto.evaluate((t) => localStorage.setItem('jsd.token.v1', t), 'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
 
   /* A malformed index must leave the board usable. Offline, a missing file and
      a local file:// open all land here, and none of them is an error state. */

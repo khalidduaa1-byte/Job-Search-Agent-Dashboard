@@ -94,6 +94,32 @@ Two things worth knowing:
 The digest arrives as the routine's output rather than as email, so it is read in the routines
 dashboard and the JSON block is copied from there into **Import digest**.
 
+### The environment needs network access, and Trusted is not enough
+
+**This is the one thing that will stop the whole pipeline dead, and it did.** The first real run
+fetched all four prompt files, ran web search, surfaced genuine leads at OpenAI, Anthropic and
+Together AI, and then **could not open a single posting**: every attempt returned 403 at the outbound
+proxy. It confirmed that four independent ways and emitted nothing, which is the verification rule in
+`prompts/daily-search.md` working exactly as written. Zero postings, no top pick, no tailoring.
+
+The cause is the cloud environment's **network access level**. The default is **Trusted**, which
+allows only a fixed allowlist: package registries, GitHub, cloud SDKs. `raw.githubusercontent.com` is
+on it, which is why the prompt fetches worked. **No job board is on it**, so nothing can be verified.
+
+Fix it at [claude.ai/code](https://claude.ai/code): select the cloud icon showing the environment name
+in the row above the message box, hover the environment, open its settings, and change **Network
+access**. There is no settings page for it.
+
+- **Full** is the pragmatic choice for this pipeline. A job search has to open **any employer's**
+  careers page, and that set cannot be enumerated in advance.
+- **Custom** works if you would rather bound it, with **Also include default list of common package
+  managers** checked so the prompt fetches keep working. The ATS hosts are the ones in `SOURCES.md`:
+  `boards-api.greenhouse.io`, `job-boards.greenhouse.io`, `api.ashbyhq.com`, `jobs.ashbyhq.com`,
+  `api.lever.co`, `jobs.lever.co`, `apply.workable.com`, `api.smartrecruiters.com`, `remotive.com`,
+  `api.adzuna.com`. Expect to keep adding employer domains, which is the argument for Full.
+
+MCP connector traffic does not go through this allowlist, so a connector works regardless.
+
 ### What tells you a morning went wrong
 
 Almost nothing, and that is worth knowing rather than discovering. The triggers API records only

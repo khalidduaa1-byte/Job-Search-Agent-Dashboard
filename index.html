@@ -121,9 +121,30 @@
 
       <div class="empty" id="empty" hidden>
         <p class="empty-h serif">Nothing on the board yet.</p>
-        <p class="empty-p"><b>This board never fills itself.</b> It lives in this browser only, so the
-          scheduled task cannot write to it and there is nothing to wait for. The morning digest ends
-          with a JSON block: paste that into <b>Import digest</b> and the roles appear here.</p>
+
+        <!-- Shown only when this browser has no digest link. Without it a plain
+             visit imported nothing and said nothing, which reads as broken. -->
+        <div id="connect" hidden>
+          <p class="empty-p"><b>This browser is not connected to your daily digest yet.</b> The morning
+            task publishes to a private path that only your link knows, so opening the plain address
+            gives you an empty board and no explanation. Paste the digest link once, or just its key,
+            and every morning after this one lands here on its own.</p>
+          <div class="connect-row">
+            <input type="text" id="token-in" spellcheck="false" autocomplete="off"
+              placeholder="Paste your digest link, or the key from it" aria-label="Digest link or key">
+            <button type="button" class="solid" id="token-save">Connect</button>
+          </div>
+          <p class="empty-p empty-note">Stored in this browser only. A phone and a laptop each need it
+            once. Anyone with the link can read the digests, so treat it like a private URL.</p>
+        </div>
+
+        <p class="empty-p" id="connected-note" hidden><b>This browser is connected.</b> Nothing has
+          been published yet, or nothing survived the filters. The morning task commits its digest and
+          the board picks it up on the next load, so there is nothing to do here.</p>
+
+        <p class="empty-p">The digest email also ends with a JSON block, and attaches a
+          <code>digest-&lt;date&gt;.json</code>. Either one goes into <b>Import digest</b> by hand if a
+          morning does not arrive.</p>
         <p class="empty-p">Want to see it working first? Load ten invented rows.</p>
         <button type="button" class="solid" id="load-sample">Load sample data</button>
       </div>

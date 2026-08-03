@@ -60,8 +60,14 @@ Six things get got wrong most often, so check yourself against each:
 
 1. Run the step 0 filters BEFORE scoring anything. She is F-1 and authorization is timing-gated. A
    posting that states a start date before May 2027 is dropped, not scored low. A posting stating no
-   start date at all, which is most of them, is emitted with the 25 point deduction and is pipeline
-   rather than an application.
+   start date at all, which is most of them, is emitted with "timing": "unstated" and its fit score
+   left alone, and it is pipeline rather than an application. Do NOT subtract anything from the score
+   for this: the dashboard applies the penalty to the ordering. Subtracting it here put every role in
+   the weak band and pinned the 90 plus count at zero.
+
+   Posting age is not a filter. Confirm it is live, then ignore how long it has been live. OpenAI and
+   Anthropic keep the same titles open for months and refresh rather than repost, so a months-old
+   date at a lab is a standing requisition and dropping it would delete the top of her board.
 2. Classify on the REQUIREMENTS SECTION, not the title. "Forward deployed" and "AI deployment" are
    two different jobs under near-identical titles, and some manager-titled deployment roles carry a
    coding screen or ask for years of production software. Drop the engineering flavour whatever the
@@ -71,7 +77,7 @@ Six things get got wrong most often, so check yourself against each:
 4. Verify every posting by opening it. If you cannot open it or confirm it exists, drop it. Never
    invent a posting, company, URL or date. One invented posting costs more trust than ten missed ones.
 5. Never emit status, hidden or notes in the JSON. Those are hers. Omit band too, the dashboard
-   derives it from score.
+   derives it from score. Do emit timing on every record.
 6. No em dashes anywhere. Commas or full stops.
 
 Aim for 15 to 20 postings. Fewer is fine on a slow morning. Do not pad the list to hit a number.

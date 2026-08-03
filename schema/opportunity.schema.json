@@ -5,9 +5,22 @@
   "description": "One job opportunity as exchanged between the search agent and the dashboard. See CONTRACT.md for field ownership and the merge policy.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "company", "location", "remote", "source", "url", "apply_url", "posted",
-               "score", "rationale", "signal", "resume_tailored"],
-  "$comment": "This schema is the agent's obligation: emit all of these. The dashboard is deliberately more tolerant than the schema, and rejects a row only when title, company or score is unusable, coercing the rest with a reported warning. Losing a real opportunity to a missing enum would be worse than showing it with a default. `band` is not required because the dashboard always derives it from `score`.",
+  "required": [
+    "title",
+    "company",
+    "location",
+    "remote",
+    "source",
+    "url",
+    "apply_url",
+    "posted",
+    "score",
+    "timing",
+    "rationale",
+    "signal",
+    "resume_tailored"
+  ],
+  "$comment": "This schema is the agent's obligation: emit all of these. The dashboard is deliberately more tolerant than the schema, and rejects a row only when title, company or score is unusable, coercing the rest with a reported warning. Losing a real opportunity to a missing enum would be worse than showing it with a default. `band` is not required because the dashboard always derives it from `score`. `timing` is required because the start-date penalty lives in the dashboard's ordering rather than in the score: a digest that omits it leaves the board unable to tell an actionable role from a presumed-immediate one.",
   "properties": {
     "id": {
       "description": "Stable hash of the dedup key. Owned by the dashboard; the agent may omit it.",
@@ -30,7 +43,12 @@
       "maxLength": 120
     },
     "remote": {
-      "enum": ["onsite", "hybrid", "remote", "unknown"]
+      "enum": [
+        "onsite",
+        "hybrid",
+        "remote",
+        "unknown"
+      ]
     },
     "source": {
       "description": "Where the posting was found. Free-form so a new adapter does not require a schema change.",
@@ -65,14 +83,26 @@
       "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
     },
     "score": {
-      "description": "0 to 100. See prompts/scoring-rubric.md.",
+      "description": "Fit, 0 to 100, and ONLY fit. See prompts/scoring-rubric.md. No start-date penalty inside this number: that is what `timing` carries. Folding the two together made the arithmetic ceiling 75, put every row in the weak band and left the 90-plus count permanently at 0.",
       "type": "integer",
       "minimum": 0,
       "maximum": 100
     },
+    "timing": {
+      "description": "Whether she can start, which is a SEPARATE axis from fit and must never be folded into `score`. \"actionable\" means a stated start on or after May 2027, aimed at 2027 graduates, explicitly flexible, or a summer 2027 internship. \"unstated\" means a full-time posting giving no start date, which is most of them: presume an immediate start, so it is pipeline rather than an application. The dashboard subtracts 25 when ORDERING an unstated row and shows a chip on it, so an unactionable role cannot outrank one she can take while its fit score still reads honestly. \"unknown\" exists only for rows written before this field and should never be emitted.",
+      "enum": [
+        "actionable",
+        "unstated",
+        "unknown"
+      ]
+    },
     "band": {
       "description": "Derived by the dashboard from score: strong >= 90, possible 70 to 89, weak < 70. If the agent emits a band that disagrees with the score, the score wins and the disagreement is reported.",
-      "enum": ["strong", "possible", "weak"]
+      "enum": [
+        "strong",
+        "possible",
+        "weak"
+      ]
     },
     "rationale": {
       "description": "One sentence on why it could fit.",
@@ -87,7 +117,14 @@
     },
     "status": {
       "description": "Human-owned. Never overwritten by an import.",
-      "enum": ["new", "saved", "applied", "interviewing", "offer", "closed"]
+      "enum": [
+        "new",
+        "saved",
+        "applied",
+        "interviewing",
+        "offer",
+        "closed"
+      ]
     },
     "hidden": {
       "description": "Human-owned. Ruled out but retained.",

@@ -171,7 +171,8 @@ pipeline leaves the machine it was entered on, and that is a real tradeoff rathe
   the board rather than stored, so they cannot drift from the rows.
 - **The stat row** is four derived counts. Their definitions, so the numbers are auditable:
   - `ROLES IN VIEW`: every row not hidden
-  - `90+ MATCH`: not hidden, score 90 or above
+  - `90+ MATCH`: not hidden, **fit** score 90 or above. Fit only: the start-date penalty is not in
+    this number, so the tile can actually reach a non-zero value
   - `APPLIED TO`: not hidden, status is applied, interviewing or offer
   - `IN PROGRESS`: not hidden, status is saved, applied, interviewing or offer
   - **All four count every row that is not hidden**, not the whole board: a hidden role is out of
@@ -189,6 +190,16 @@ pipeline leaves the machine it was entered on, and that is a real tradeoff rathe
     Tuesday, the merge policy keeps the status you already set, and a row with a status of
     applied, interviewing, offer or closed is not listed. Verified in the browser: re-importing
     the whole digest after marking a role applied leaves the list unchanged.
+- **The score is fit. Whether she can start is separate.** A role that fits at 93 shows 93, and if
+  the posting states no start date it carries a `start unstated` chip and is **ordered** 25 points
+  lower, so a role she can actually take still heads the morning. The penalty used to live inside the
+  score, which made 75 the arithmetic ceiling, put every row of a real digest in the `weak` band and
+  pinned the 90-plus tile at a permanent 0. One number cannot answer both "how good is this" and "can
+  she take it".
+- **What an import flagged stays on screen.** A rejected row, a coerced field or two roles merged as
+  one raises a band above the results that survives a reload, and `Last import` in the right rail is
+  the plain record of what happened, including on a morning that imported itself while nobody was
+  watching. The band is dismissible and the rail card brings it back.
 - **Filtering** composes across free-text search, status and score band. The header count
   follows, and reads `N to action, M already in your pipeline` so the two numbers cannot be
   confused.

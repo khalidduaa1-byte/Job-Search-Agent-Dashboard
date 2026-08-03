@@ -55,8 +55,45 @@
     var t = digestToken();
     return t ? 'data/digests/' + t + '/' + file : '';
   }
+
+  /* Accept the whole link as readily as the bare key.
+
+     The link is what she actually has, in a bookmark or a message to herself, and
+     asking someone to extract a 32-character substring from a URL by hand is a
+     way to get a wrong answer. Anything that looks like a key inside the string
+     wins, whether it arrived as `...vercel.app/#k=KEY`, `#k=KEY` or just `KEY`. */
+  function readToken(input) {
+    var s = String(input || '').trim();
+    var m = /(?:^|[#&?])k=([A-Za-z0-9_-]{16,})/.exec(s);
+    if (m) return m[1];
+    return /^[A-Za-z0-9_-]{16,}$/.test(s) ? s : '';
+  }
+
+  function storeToken(t) {
+    try { localStorage.setItem(TOKEN_KEY, t); return true; } catch (e) { return false; }
+  }
   var STATUSES = ['new', 'saved', 'applied', 'interviewing', 'offer', 'closed'];
   var REMOTES = ['onsite', 'hybrid', 'remote', 'unknown'];
+
+  /* Whether she can act on the role now, which is a separate axis from how well
+     it fits. See TIMING_PENALTY below for why the two had to be pulled apart. */
+  var TIMINGS = ['actionable', 'unstated', 'unknown'];
+
+  /* An unstated start date must not put a role at the top of the morning, but it
+     must not be confused with a bad fit either.
+
+     The rubric used to subtract 25 from the score itself. That kept the ordering
+     honest and made the number meaningless: OpenAI's AI Deployment Manager fits
+     her at 93 and was published as 68, every posting in the digest took the same
+     hit because almost none state a start date, so all nine rendered "weak", the
+     90-plus tile read 0, and the whole band vocabulary died. With the deduction
+     inside the score, 90 was unreachable by arithmetic and 75 was the ceiling.
+
+     The penalty was only ever about ORDER, so it is applied to order alone.
+     `score` is fit. `timing` says whether she can start. Sorting subtracts this
+     for an unstated start, so an unactionable role still cannot outrank an
+     actionable one, which is the entire reason the deduction existed. */
+  var TIMING_PENALTY = 25;
   var PIPELINE = ['saved', 'applied', 'interviewing', 'offer'];
 
   /* Once you have applied, the role is not something to action tomorrow
@@ -403,6 +440,18 @@
       warnings.push('remote "' + raw.remote + '" is not a known value, set to unknown');
     }
 
+    /* Coerced, not rejected, and quietly when absent. A digest written before
+       timing existed carries scores that already had the 25 subtracted, and
+       guessing which is which is not possible, so an old row keeps its number
+       and is marked unknown rather than being silently re-penalised in the sort.
+       Tomorrow's digest re-emits the same posting and corrects it. */
+    var timing = TIMINGS.indexOf(raw.timing) === -1 ? 'unknown' : raw.timing;
+    if (raw.timing && timing !== raw.timing) {
+      warnings.push('timing "' + raw.timing + '" is not one of actionable, unstated or ' +
+                    'unknown, so it was set to unknown and this role is not ordered as ' +
+                    'either. Check the start date on the posting.');
+    }
+
     var band = bandOf(score);
     if (raw.band && raw.band !== band) {
       warnings.push('band "' + raw.band + '" disagrees with score ' + score + ', corrected to ' + band);
@@ -434,6 +483,7 @@
       posted: /^\d{4}-\d{2}-\d{2}$/.test(raw.posted) ? raw.posted : '',
       score: score,
       band: band,
+      timing: timing,
       rationale: String(raw.rationale || '').trim(),
       signal: String(raw.signal || '').trim(),
       resume_tailored: raw.resume_tailored === true
@@ -503,7 +553,7 @@
           remote: rec.remote, source: rec.source, url: rec.url,
           apply_url: rec.apply_url, posted: rec.posted,
           first_seen: today, last_seen: today,
-          score: rec.score, band: rec.band, rationale: rec.rationale,
+          score: rec.score, band: rec.band, timing: rec.timing, rationale: rec.rationale,
           signal: rec.signal, resume_tailored: rec.resume_tailored,
           status: rec._status, hidden: rec._hidden, notes: rec._notes
         });
@@ -524,6 +574,7 @@
         cur.posted = rec.posted || cur.posted;
         cur.score = rec.score;
         cur.band = rec.band;
+        cur.timing = rec.timing;
         cur.rationale = rec.rationale || cur.rationale;
         cur.signal = rec.signal || cur.signal;
         /* Assigned, not or-ed. The agent emits this boolean on every record, so
@@ -574,8 +625,17 @@
       return (r.company + ' ' + r.title + ' ' + r.rationale + ' ' + r.location + ' ' + r.source)
         .toLowerCase().indexOf(q) !== -1;
     }).sort(function (a, b) {
-      return b.score - a.score || a.company.localeCompare(b.company);
+      return rank(b) - rank(a) || b.score - a.score || a.company.localeCompare(b.company);
     });
+  }
+
+  /* Order by fit, less the timing penalty. This is the only place the 25 points
+     are applied, and applying them here rather than to `score` is what lets the
+     board show a 93 as a 93 while still refusing to put a role she cannot start
+     above one she can. Score breaks ties within a rank so the fit ordering
+     survives underneath, which is what the flat cap destroyed. */
+  function rank(r) {
+    return r.score - (r.timing === 'unstated' ? TIMING_PENALTY : 0);
   }
 
   /* Render --------------------------------------------------------- */
@@ -584,7 +644,8 @@
     ['last-updated', 'report-label', 'best-company', 'best-meta', 's-inview', 's-strong',
      's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'latest-seen',
      'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast',
-     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show'].forEach(function (id) {
+     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show',
+     'connect', 'connected-note', 'token-in', 'token-save'].forEach(function (id) {
       el[id] = document.getElementById(id);
     });
   }
@@ -592,6 +653,10 @@
   function renderStats() {
     var vis = visible();
     el['s-inview'].textContent = vis.length;
+    /* 90 and above, on fit. This tile read 0 every single day while the penalty
+       lived inside the score, because 75 was then the arithmetic ceiling for the
+       vast majority of postings and the strong band could not be reached at all.
+       A number that cannot move is not a statistic, it is a dead pixel. */
     el['s-strong'].textContent = vis.filter(function (r) { return r.score >= 90; }).length;
     el['s-applied'].textContent = vis.filter(function (r) {
       return r.status === 'applied' || r.status === 'interviewing' || r.status === 'offer';
@@ -641,12 +706,15 @@
        says something true rather than going blank, and label it. */
     var pool = todays.length ? todays : visible();
     var actionable = pool.filter(function (r) { return DONE.indexOf(r.status) === -1; });
+    /* rank(), not score, for the same reason the list uses it: the top pick and
+       the tailored resume are supposed to go to a role she can actually start. */
     var best = (actionable.length ? actionable : pool)
-      .slice().sort(function (a, b) { return b.score - a.score; })[0];
+      .slice().sort(function (a, b) { return rank(b) - rank(a) || b.score - a.score; })[0];
     if (best) {
       el['best-company'].textContent = best.company;
       el['best-meta'].textContent = [best.title, best.location || best.remote,
                                     best.score + ' match score',
+                                    best.timing === 'unstated' ? 'start date unstated' : '',
                                     DONE.indexOf(best.status) === -1 ? '' : 'already ' + best.status]
                                     .filter(Boolean).join(' · ');
     } else if (board.length) {
@@ -706,6 +774,14 @@
             '<span class="row-title">' + esc(r.title) + '</span>' +
           '</span>' +
           '<span class="row-evi">' + esc(r.signal || r.location) + '</span>' +
+          /* The reason a 93 is not at the top. Without it the sort order looks
+             arbitrary: the number says this is the best fit on the board and
+             something else is above it, with nothing on screen explaining why. */
+          (r.timing === 'unstated'
+            ? '<span class="pill st-timing" title="The posting states no start date, so it is ' +
+              'presumed immediate and ordered below roles you can actually start. Pipeline ' +
+              'rather than an application.">start unstated</span>'
+            : '') +
           '<span class="pill st-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
           (applyUrl
             ? '<a class="row-apply" href="' + esc(applyUrl) + '" target="_blank" rel="noopener"' +
@@ -721,6 +797,8 @@
             '<span>Arrangement <b>' + esc(r.remote) + '</b></span>' +
             '<span>Source <b>' + esc(r.source) + '</b></span>' +
             '<span>Posted <b>' + esc(r.posted || 'not stated') + '</b></span>' +
+            '<span>Start date <b>' + (r.timing === 'actionable' ? 'works for you'
+              : r.timing === 'unstated' ? 'not stated' : 'not assessed') + '</b></span>' +
             '<span>First seen <b>' + esc(r.first_seen) + '</b></span>' +
             '<span>Last seen <b>' + esc(r.last_seen) + '</b></span>' +
             (r.resume_tailored ? '<span><b>Tailored resume sent</b></span>' : '') +
@@ -819,12 +897,29 @@
     }
   }
 
+  /* An empty board has two completely different causes and they need different
+     words. Not connected: nothing will ever arrive, and there is something to do
+     about it. Connected but empty: everything is working and there is nothing to
+     do, which is a quiet morning rather than a fault.
+
+     Before this, both said "this board never fills itself", which stopped being
+     true when auto-import landed. Opening the plain address imported nothing and
+     explained nothing, so a working deployment was indistinguishable from a
+     broken one, and the only clue was a token in a URL she had to already know. */
+  function renderConnect() {
+    if (!el['connect']) return;
+    var has = !!digestToken();
+    el['connect'].hidden = has;
+    if (el['connected-note']) el['connected-note'].hidden = !has;
+  }
+
   function render() {
     renderStats();
     renderHeader();
     renderRows();
     renderRail();
     renderNotices();
+    renderConnect();
   }
 
   /* Toast ---------------------------------------------------------- */
@@ -971,11 +1066,15 @@
         lines.push('- nothing yet');
       }
       lines.push('');
-      lines.push('## Scored 90 plus and not actioned. This is the Friday roundup list.');
+      lines.push('## Scored 90 plus on fit and not actioned. This is the Friday roundup list.');
+      lines.push('# The score is fit, with no start-date penalty inside it. "start unstated" means');
+      lines.push('# the posting gave no start date, so it is pipeline rather than an application.');
       if (openStrong.length) {
         openStrong.forEach(function (r) {
           lines.push('- ' + r.score + ' | ' + r.company + ' | ' + r.title +
-                     ' | ' + r.status + ' | first seen ' + r.first_seen);
+                     ' | ' + r.status +
+                     (r.timing === 'unstated' ? ' | start unstated' : '') +
+                     ' | first seen ' + r.first_seen);
         });
       } else {
         lines.push('- nothing outstanding');
@@ -1061,6 +1160,49 @@
         rec.dismissed = '';
         saveNotice(rec);
         renderNotices();
+      });
+    }
+
+    /* Connect this browser to the digest path. Imports straight away rather than
+       waiting for a reload, because "paste the link, nothing happens, reload and
+       hope" is the same silence this whole affordance exists to remove. */
+    if (el['token-save']) {
+      var connect = function () {
+        var t = readToken(el['token-in'].value);
+        if (!t) {
+          toast('That does not look like a digest link. Paste the whole link, or just the key from ' +
+                'after the "k=", which is at least 16 letters, numbers, dashes or underscores.');
+          return;
+        }
+        if (!storeToken(t)) {
+          toast('This browser will not let the page store anything, which is usually private ' +
+                'browsing. The link cannot be remembered here, so use Import digest instead.');
+          return;
+        }
+        el['token-in'].value = '';
+        renderConnect();
+        toast('Connected. Looking for a digest now.');
+        autoImport()
+          .then(function (results) {
+            reportAutoImport(results);
+            render();
+            if (!results || !results.length) {
+              /* Distinguish a wrong key from a morning with nothing in it. Both
+                 leave the board empty, and only one of them is her problem. */
+              toast('Connected, but nothing was found at that path yet. Either no digest has been ' +
+                    'published, or the key is not the right one. Check the link and try again.');
+            }
+          })
+          .catch(function () {
+            /* A 404 from a wrong key lands here too, so do not blame the network
+               alone: the likeliest cause by far is a mistyped or stale key. */
+            toast('Connected, but nothing could be read at that path. Usually that means the key is ' +
+                  'wrong. It can also mean this page was opened as a file rather than over http.');
+          });
+      };
+      el['token-save'].addEventListener('click', connect);
+      el['token-in'].addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); connect(); }
       });
     }
 

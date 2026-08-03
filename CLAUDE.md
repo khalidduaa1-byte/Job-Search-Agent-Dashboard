@@ -28,7 +28,8 @@ framework, no dependencies.** Edit a file, push, it deploys.
 | `resume/master-resume.md` | **The master resume**, the AI PM and GTM variant. The tailoring input |
 | `resume/Duaa-Khalid-resume-CSM.pdf` | The CSM variant as exported. Layout reference only, never tailor from it |
 | `resume/README.md` | Why the markdown is the master, plus the open resume issues checklist |
-| `tests/check.mjs` | 79 browser assertions. Playwright, ad hoc, **not** a repo dependency |
+| `resume/render.mjs` | Markdown to a one-page PDF. Exits non-zero when a tailored file overflows |
+| `tests/check.mjs` | Browser assertions. Playwright, ad hoc, **not** a repo dependency |
 | `SOURCES.md` | Where jobs come from, and why LinkedIn, Indeed, Apify and Composio are not adapters |
 | `data/` | Invented sample data. Two files: a board seed and a one-morning digest |
 | `designprompt.md` | The Claude Design brief for the token layer |
@@ -98,6 +99,25 @@ while chasing a feature.
 11. **Every outbound link opens in a new tab** with `rel="noopener"`.
 12. **Nothing in this repo touches `duaakhalid-site`.** Different project, different design
     system, different repo. The portfolio deliberately does not carry a job-search project block.
+
+## The loop is open in one direction, and that is the interesting constraint
+
+The agent can write to the board, via a digest she pastes. **The board cannot write back**, because
+there is no server. Everything the scheduled task gets wrong on a repeat morning traces to this:
+
+- it re-emits a role she applied to, because it cannot see that she did
+- it re-sells a role she deliberately hid, which reads as the search not listening
+- the Friday roundup cannot answer "what is still unactioned at 90 plus", the one section with a
+  deadline attached
+
+The fix is not a backend. It is the **Agent brief** button, which produces the smallest text that
+closes the loop: the skip list, and the unactioned 90-plus list. She pastes it into the scheduled
+task or hosts it somewhere the task fetches. Both prompts say what to do when it is absent, which is
+to say so in one line rather than guess, because a model guessing at her triage is wrong in the
+section she most needs to trust.
+
+Do not "fix" this by adding a server. Her pipeline leaving her machine is the thing the whole design
+is avoiding, and it is stated as a tradeoff in the README rather than an oversight.
 
 ## The board lives in localStorage
 

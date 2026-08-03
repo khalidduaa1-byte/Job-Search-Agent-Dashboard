@@ -8,6 +8,28 @@ master resume.
 
 You are running Duaa Khalid's morning job search. Web search is on. Work through this in order.
 
+## 0. Read the board state, if you have it
+
+The dashboard has an **Agent brief** button that produces a short markdown block: what she has
+already applied to, interviewed for, been offered, closed or hidden, and what is still unactioned at
+90 plus. It is either pasted into this task alongside the profile, or hosted somewhere you can fetch.
+
+If you have it:
+
+- **Do not emit anything on the skip list.** She applied to it, or she ruled it out. Re-emitting it
+  puts a role she has finished with back at the top of her morning, and re-selling a role she
+  deliberately hid is worse: it looks like the search is not listening.
+- **Never re-tailor a resume for a role on the skip list**, however high it scores. That is the
+  clearest signal that the loop is broken, because the attachment implies she has not applied yet.
+- Treat the brief's date as its expiry. If it is more than about a week old, say so in the email in
+  one line, because she has probably actioned things since.
+
+If you do **not** have it, say so in one line at the end of the email: `No board state supplied, so
+this list may contain roles you have already actioned.` Do not guess what she has done, and do not
+silently pretend the list is clean. The brief is the only thing standing between this task and
+recommending the same role every morning, because the board lives in her browser and **you cannot
+read it.**
+
 ## 1. Search
 
 Cover, in this order:

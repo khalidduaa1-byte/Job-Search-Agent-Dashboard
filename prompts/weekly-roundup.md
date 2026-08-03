@@ -34,8 +34,18 @@ Body:
    that came up empty. If the week was thin, say the week was thin.
 2. **Top five**, with the still-open check. `<score> · <Role> · <Company> · <Location> · still
    open / closed / unconfirmed` and the link.
-3. **What is sitting unactioned.** Anything that scored 90 plus this week that she has not
-   applied to. This is the part with a deadline attached, so keep it short and specific.
+3. **What is sitting unactioned.** Anything that scored 90 plus this week that she has not applied
+   to. This is the part with a deadline attached, so keep it short and specific.
+
+   **This section requires the Agent brief** from the dashboard, whose second half is exactly this
+   list. Applied state lives in her browser under `jsd.board.v1` and there is no server, so **you
+   cannot work it out.** With the brief, use its 90-plus section and say when it was generated.
+   Without it, write one line: `No board state supplied, so I cannot tell which of the week's 90 plus
+   you have actioned. The dashboard's Agent brief button produces it.` Then list the week's 90 plus
+   and stop.
+
+   Do not infer it from the digests. A model guessing here is wrong every Friday in the section that
+   is supposed to carry a deadline, which trains her to skip it.
 4. **One thing to change next week**, and only if you have a real one. A search that is not
    returning anything, a title worth adding to the watchlist, a company worth tracking
    directly. If there is nothing, write `Nothing to change` and stop. An invented suggestion

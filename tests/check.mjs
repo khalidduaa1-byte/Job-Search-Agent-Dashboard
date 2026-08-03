@@ -363,8 +363,31 @@ eq('and it did not come back into the daily list', await rowIds(page), listAfter
 eq('its applied status survived',
   (await board(page)).find((r) => r.company === 'Halyard Compute').status, 'applied');
 
+/* -- The agent brief ----------------------------------------------
+   The scheduled task cannot read this board, so the brief is the only thing
+   that stops it re-emitting a role she has actioned. Assert it names the
+   applied and hidden rows, and the unactioned 90-plus ones. */
+console.log('\nAgent brief');
+await reset(page);
+await page.evaluate(() => navigator.clipboard.writeText = undefined);
+const briefDl = await Promise.all([page.waitForEvent('download'), page.click('#brief')])
+  .then((r) => r[0]);
+const briefText = readFileSync(await briefDl.path(), 'utf8');
+ok('brief filename is dated', /^agent-brief-\d{4}-\d{2}-\d{2}\.md$/.test(briefDl.suggestedFilename()),
+  briefDl.suggestedFilename());
+ok('brief lists an applied role to skip', /Lumina Systems \| AI Deployment Manager \| applied/.test(briefText));
+ok('brief lists a hidden role to skip', /Pinebrook Logistics .* \| hidden/.test(briefText));
+ok('brief lists the interviewing role to skip', /Northwind AI .* \| interviewing/.test(briefText));
+ok('brief does not tell the agent to skip an actionable role',
+  !/Halyard Compute \| Deployment Strategist \| (applied|hidden|interviewing)/.test(briefText));
+ok('brief names the unactioned 90-plus role for the Friday roundup',
+  /93 \| Halyard Compute/.test(briefText), briefText.slice(-300));
+ok('brief excludes actioned roles from the unactioned list',
+  briefText.split('not actioned')[1].indexOf('Lumina') === -1);
+
 /* -- Export -------------------------------------------------------- */
 console.log('\nExport');
+await reset(page);
 const dl = await Promise.all([page.waitForEvent('download'), page.click('#export')]).then((r) => r[0]);
 ok('export filename is dated', /^jsd-board-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
   dl.suggestedFilename());

@@ -63,13 +63,27 @@ overwrite the prescore on import, because `score` is an agent-owned field.
 
 ## Setting up the scheduled tasks
 
-1. Create a Claude scheduled task for weekday mornings, Monday to Thursday.
-2. Paste `prompts/daily-search.md` as the instructions.
-3. Attach or paste `prompts/profile.md` and `prompts/scoring-rubric.md`, and attach the master
-   resume.
-4. Repeat for Friday with `prompts/weekly-roundup.md`.
-5. Turn web search on. Without it the task cannot verify a posting exists, and the prompt tells
-   it to drop anything it cannot open.
+Two routines, both firing at 05:00 UTC:
+
+| Routine | Schedule | Reads |
+| --- | --- | --- |
+| `Job search: daily digest (Mon-Thu)` | `0 5 * * 1-4` | `prompts/daily-search.md` |
+| `Job search: Friday roundup` | `0 5 * * 5` | `prompts/weekly-roundup.md` |
+
+Each one reads its prompt, plus `prompts/profile.md`, `prompts/scoring-rubric.md` and
+`resume/master-resume.md`, straight from this repo, so **editing a prompt here changes what next
+morning's task does.** That is the point of keeping them as files: no routine needs re-pasting when
+the rubric changes.
+
+Two things worth knowing:
+
+- **Web search has to be on.** Without it the task cannot verify a posting exists, and the prompt
+  tells it to drop anything it cannot open.
+- **05:00 UTC is 9am Dubai and 1am New York.** Change the hour to `11` when she moves, so it lands
+  at 7am Eastern rather than in the middle of the night.
+
+The digest arrives as the routine's output rather than as email, so it is read in the routines
+dashboard and the JSON block is copied from there into **Import digest**.
 
 ## Running the dashboard
 
@@ -126,6 +140,12 @@ pipeline leaves the machine it was entered on, and that is a real tradeoff rathe
   button. It is never deleted, and it stays in the export, so a decision is recoverable.
 - **Notes** per row, for call prep and who you spoke to.
 - **Export** downloads the whole board as JSON, hidden rows included.
+- **Agent brief** copies the one thing the scheduled task cannot work out for itself: what she has
+  already applied to or hidden, and what is still unactioned at 90 plus. The task has no read path to
+  this board and never will, because there is no server, so without the brief it re-emits roles she
+  has finished with and the Friday roundup cannot answer the question it is built around. Paste it
+  into the task, or host it somewhere the task can fetch. Both prompts say what to do when it is
+  missing, which is to say so rather than guess.
 
 Hiding and applying are different actions on purpose. Hidden means *not for me*. Applied means
 *done with, for now*. Both leave the daily list; only one of them is a judgment about the role.

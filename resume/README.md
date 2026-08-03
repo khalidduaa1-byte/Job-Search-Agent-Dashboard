@@ -7,7 +7,30 @@ attachment.
 | File | What it is |
 | --- | --- |
 | `master-resume.md` | **The master.** The AI PM and GTM variant, in text. This is what the tailoring prompt reads |
-| `Duaa-Khalid-resume-CSM.pdf` | The CSM variant as exported. **Layout reference only.** Do not tailor from it |
+| `render.mjs` | Markdown to a one-page PDF. Chromium, no new dependencies |
+| `master-resume.pdf` | Generated from the markdown. Regenerate, do not edit |
+| `Duaa-Khalid-resume-CSM.pdf` | The original CSM export. **Layout reference only.** Do not tailor from it |
+
+## Producing the document
+
+```
+node resume/render.mjs                        # the master
+node resume/render.mjs path/to/tailored.md    # a tailored version
+CHROME_PATH=/path/to/chrome node resume/render.mjs
+```
+
+The prompts require the tailored resume "as a document, one page", and nothing in the repo could
+produce one, so that step was a silent manual handoff and "one page" was unverifiable. `render.mjs`
+counts the pages in the PDF it just wrote and **exits non-zero when a tailored file runs over one**,
+so the constraint is checked rather than hoped for.
+
+The master itself renders to two pages and that is fine. It is a superset that holds every bullet so
+tailoring only ever drops, and it is not a document she sends. Only tailored output is held to one
+page.
+
+The print CSS in `render.mjs` is the layout contract, shared by every version. If a tailored file
+overflows, **drop a bullet**, which the tailoring rules allow. Do not shrink the type, because then
+each version she sends looks like a different document.
 
 ## Why the markdown is the master and the PDF is not
 
@@ -50,8 +73,10 @@ Still open, and neither is mine to close:
   still in `master-resume.md` under the LVMH role. Check the email before that bullet goes out, and
   cut it if the two do not agree. A bullet that contradicts something already in writing is the
   worst kind, because the contradiction is discoverable.
-- [ ] **The PDF still reads `Dubai, UAE`** and cannot be corrected in place, for the reason above.
-  Change the header in whatever produced it and re-export.
+- [x] **The contact line read `Dubai, UAE` in the PDF.** Closed by `render.mjs`:
+  `master-resume.pdf` is generated from the markdown and reads `New York, NY`. The original
+  `Duaa-Khalid-resume-CSM.pdf` still says Dubai and always will, which is why it is a layout
+  reference and not something to send.
 - [ ] **The phone number is a UAE mobile**, `+971 56 364 0419`, sitting under a New York address.
   Left exactly as it is, because inventing a US number would be worse. It is normal for someone
   relocating, but decide it deliberately rather than hearing about it from a recruiter who did not

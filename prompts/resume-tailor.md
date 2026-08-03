@@ -121,8 +121,16 @@ invention.
    edit; a diff cannot. If the diff shows a number changed, that is a bug in the tailoring, not a
    judgment call.
 
-2. **The tailored resume**, as a document attached to the morning email. Same layout as the master.
-   One page.
+2. **The tailored resume**, as a document attached to the morning email. Same layout as the master,
+   one page. `resume/render.mjs` produces it from the markdown and **exits non-zero if it runs over
+   one page**, so the page count is checked rather than asserted:
+
+   ```
+   node resume/render.mjs tailored-<company>.md
+   ```
+
+   If it overflows, **drop a bullet.** Dropping is allowed and shrinking the type is not: the print
+   CSS is the layout contract and every version she sends has to look like the same document.
 
 3. **A one-line note for the email**, stating what you actually changed. `Led with the tracker
    rollout and the 18-advisor adoption, moved the D and G portfolio bullet above the QBR one,

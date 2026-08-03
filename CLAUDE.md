@@ -135,8 +135,25 @@ shape changes, bump to `jsd.board.v2` and write the migration.
 
 ## The dedup key
 
-`url`, normalised: lowercased, query string and fragment stripped, trailing slash removed.
-Falling back to `company|title|location` with punctuation removed and whitespace collapsed.
+Two keys, and a row matches on **either**:
+
+1. `url`, normalised: lowercased, query string and fragment stripped, trailing slash removed.
+2. `company|title`, lowercased, punctuation removed, whitespace collapsed.
+
+**`location` is deliberately not in the second key.** It used to be, and it made the key useless
+against a real aggregator: the same posting arrives as `New York, NY` from the employer board and
+`New York, New York` or `New York, NY (Hybrid)` from a job site. Each variant landed a fresh row at
+status `new`, so a role she had applied to came straight back into the daily list, which is exactly
+what non-negotiable 2 exists to prevent. Measured before the fix: three location variants produced
+four Lumina rows with statuses `applied, new, new, new`.
+
+The tradeoff, stated so nobody re-adds it: two genuinely different roles with the same title at the
+same company in two cities now merge into one row. Rare, the search is New York and remote-US only,
+and one row instead of two is a much smaller failure than an applied role reappearing every morning.
+
+The remaining hole is a **title** rewrite, `AI Deployment Manager - New York`, which no string key
+catches. That is why the Agent brief carries the canonical URL on every skip row: the agent can match
+on a URL even when the title has been mangled.
 
 The normalisation is load-bearing, not tidiness. The morning digest arrives with
 `?utm_source=digest` on the same posting that is already on the board, and without stripping the

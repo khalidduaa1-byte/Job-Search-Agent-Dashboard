@@ -23,9 +23,12 @@ useful thing this task does that the daily digests cannot.
 
 Mark each as still open, closed, or could not confirm. Do not guess.
 
-## 3. Write the email
+## 3. Write the roundup
 
-Subject: `Weekly roundup, week of <D Month>, <N> roles, <M> at 90 plus`
+Send it if an email tool is available. If not, your final response is the roundup and she reads it in
+the routines dashboard. The shape is the same either way.
+
+Subject, or the first line: `Weekly roundup, week of <D Month>, <N> roles, <M> at 90 plus`
 
 Body:
 

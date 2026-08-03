@@ -121,9 +121,14 @@ tailoring target, because that cap is about her odds, not about timing.
 Say in the email which one it was and whether it is actionable today, so the attachment never implies
 a deadline that does not exist.
 
-## 5. Send the email
+## 5. Write the digest
 
-Subject: `Job search, <weekday> <D Month>, <N> roles, top match <Company> (<score>)`
+**Where this goes depends on how the task is set up, and both are supported.** If an email tool is
+available, send it. If not, your final response **is** the digest and she reads it in the routines
+dashboard. Either way the shape below is the same, and the subject line is still worth writing
+because it is the one-line summary she sees first.
+
+Subject, or the first line: `Job search, <weekday> <D Month>, <N> roles, top match <Company> (<score>)`
 
 Body, in this order:
 

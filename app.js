@@ -76,8 +76,22 @@
     return u ? u.toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '') : '';
   }
 
+  /* Company and title only. Location is deliberately NOT in this key.
+
+     It used to be, and it made the key useless against a real aggregator: the
+     same posting arrives as "New York, NY" from the employer board and
+     "New York, New York" or "New York, NY (Hybrid)" from a job site, which are
+     three different strings for one place. A role she had applied to came back
+     as a fresh row at status new, which is the one thing rule 2 in CLAUDE.md
+     exists to prevent.
+
+     The tradeoff, stated so nobody re-adds it: two genuinely different roles
+     with the same title at the same company in two different cities now merge
+     into one row. That is rare, the search is New York and remote-US only, and
+     showing one row instead of two is a far smaller failure than an applied
+     role reappearing every morning. */
   function identityKey(rec) {
-    return [rec.company, rec.title, rec.location].map(function (p) {
+    return [rec.company, rec.title].map(function (p) {
       return String(p || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
     }).join('|');
   }
@@ -99,7 +113,7 @@
     var u = urlKey(rec);
     if (u) out.push(u);
     var i = identityKey(rec);
-    if (i && i !== '||') out.push(i);
+    if (i && i !== '|') out.push(i);
     return out;
   }
 
@@ -172,6 +186,19 @@
     }
 
     if (!raw.rationale) warnings.push('no rationale supplied');
+
+    /* Warn loudly when the agent sends a human-owned field. The merge already
+       ignores these for a row the board has seen, but for a NEW row they are
+       read as defaults, so a digest carrying "hidden": true lands a strong role
+       invisible and nothing said so. Both prompts forbid emitting these three,
+       so their presence means the agent is off-spec and she should know. */
+    ['status', 'hidden', 'notes'].forEach(function (f) {
+      if (raw[f] !== undefined) {
+        warnings.push('the digest carried "' + f + '", which is yours to set, not the agent\'s. ' +
+                      'Ignored for a row already on the board, used as the starting value for a ' +
+                      'new one, so check this row is where you expect it.');
+      }
+    });
 
     var rec = {
       title: String(raw.title).trim(),
@@ -296,8 +323,8 @@
   var el = {};
   function cache() {
     ['last-updated', 'report-label', 'best-company', 'best-meta', 's-inview', 's-strong',
-     's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'rows',
-     'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast'].forEach(function (id) {
+     's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'latest-seen',
+     'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast'].forEach(function (id) {
       el[id] = document.getElementById(id);
     });
   }
@@ -323,8 +350,19 @@
       : 'DAILY OPPORTUNITY REPORT';
     el['latest-date'].textContent = latest ? prettyDate(latest) : 'No reports yet';
 
+    /* Count what ARRIVED today, not what was seen today.
+
+       merge() bumps last_seen on every row an import touches, and the agent
+       re-emits live postings every morning, so counting last_seen meant a
+       morning where nothing new turned up still reported "August 4, 10 JOBS".
+       The board could not tell 10 arrived from 10 re-seen, which is the same
+       staleness weekly-roundup.md forbids the Friday task from causing. */
     var todays = visible().filter(function (r) { return r.last_seen === latest; });
-    el['latest-count'].textContent = todays.length;
+    var arrived = todays.filter(function (r) { return r.first_seen === latest; });
+    el['latest-count'].textContent = arrived.length;
+    el['latest-seen'].textContent = arrived.length === todays.length
+      ? ''
+      : ' new, ' + (todays.length - arrived.length) + ' still live';
 
     /* "Best opportunity today" is a recommendation, so it has to respect the
        same rule the daily list does: a role she has already applied to is not
@@ -344,6 +382,15 @@
                                     best.score + ' match score',
                                     DONE.indexOf(best.status) === -1 ? '' : 'already ' + best.status]
                                     .filter(Boolean).join(' · ');
+    } else if (board.length) {
+      /* Rows exist but every one is hidden. Saying "nothing imported yet" here
+         is simply false, and there is no affordance either, because the empty
+         state is gated on the board being empty rather than on the view being
+         empty. Say what is actually true. */
+      el['best-company'].textContent = 'Everything is hidden';
+      el['best-meta'].textContent = board.length + ' role' + (board.length === 1 ? '' : 's') +
+        ' on the board, all of them ruled out. Restore one from Hidden roles.';
+      el['latest-date'].textContent = 'All hidden';
     } else {
       el['best-company'].textContent = 'Nothing imported yet';
       el['best-meta'].textContent = 'Import a digest to see the day’s top match.';
@@ -592,10 +639,18 @@
       lines.push('# Generated by the dashboard. Do not edit by hand.');
       lines.push('');
       lines.push('## Do not emit these again. Applied, interviewing, offer, closed or hidden.');
+      lines.push('# Match on the URL where there is one, because an aggregator will change the');
+      lines.push('# title and the location for the same job. "Saved" is NOT on this list: a role');
+      lines.push('# she saved but has not actioned is still worth re-emitting.');
       if (skip.length) {
+        /* The canonical URL is on every skip row on purpose. Without it the
+           agent has to match on a name string, and a name string is exactly
+           what an aggregator mangles: "AI Deployment Manager - New York" is a
+           different string for the same job. A URL is matchable. */
         skip.forEach(function (r) {
           lines.push('- ' + r.company + ' | ' + r.title +
-                     ' | ' + (r.hidden ? 'hidden' : r.status));
+                     ' | ' + (r.hidden ? 'hidden' : r.status) +
+                     (r.url ? ' | ' + r.url : ''));
         });
       } else {
         lines.push('- nothing yet');
@@ -695,12 +750,17 @@
          is one with ```json on the front. Failing that with "unexpected token"
          would break the only manual step in the pipeline, before work, on a
          phone. Also tolerate leading prose up to the first bracket. */
-      var raw = txt.value.trim()
-        .replace(/^```[a-z]*\s*/i, '')
-        .replace(/\s*```$/, '')
-        .trim();
+      /* Trim from both ends. Anchoring the closing fence to end-of-string meant
+         one trailing sentence, a signature, or a footer after the block broke
+         the import, and a four-backtick fence was not matched at all. Markdown
+         uses four whenever the content itself contains a fence, which the
+         prompt files do. So: find the first bracket and the last matching one,
+         and keep what is between them. */
+      var raw = txt.value.trim().replace(/^`{3,}[a-z]*\s*/i, '').replace(/\s*`{3,}$/, '').trim();
       var firstBracket = raw.search(/[[{]/);
       if (firstBracket > 0) raw = raw.slice(firstBracket);
+      var lastBracket = Math.max(raw.lastIndexOf(']'), raw.lastIndexOf('}'));
+      if (lastBracket !== -1 && lastBracket < raw.length - 1) raw = raw.slice(0, lastBracket + 1);
 
       var parsed;
       try {

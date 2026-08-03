@@ -284,6 +284,9 @@ summary:focus-visible, .restore:focus-visible {
   flex-shrink: 0;
 }
 .jobs-chip b { font-size: 14px; letter-spacing: 0; }
+/* "N JOBS new, M still live" when a morning re-saw rows rather than finding
+   them. Empty when everything in the latest report actually arrived today. */
+.jobs-seen { font-weight: 400; letter-spacing: 0.04em; opacity: 0.75; }
 
 /* A row ------------------------------------------------------------ */
 .row {
@@ -305,16 +308,34 @@ summary:focus-visible, .restore:focus-visible {
 .row > summary::-webkit-details-marker { display: none; }
 .row > summary::marker { content: ''; }
 
+/* Three bands have to be three bands. `is-possible` and `is-weak` both used
+   --surface-quiet, so their backgrounds were pixel-identical and the only
+   difference between an 86 and a 36 was ink colour at 14px inside a 40px
+   circle. The ranking is the product, so the tiers get a border weight and a
+   fill each, which also means they are distinguishable without relying on
+   colour alone. */
 .score {
   width: 40px; height: 40px;
   border-radius: 50%;
+  font: 600 14px/38px var(--serif);
+  text-align: center;
+  box-sizing: border-box;
+}
+.score.is-strong {
   background: var(--accent-soft);
   color: var(--accent-deep);
-  font: 600 14px/40px var(--serif);
-  text-align: center;
+  border: 1px solid var(--accent);
 }
-.score.is-possible { background: var(--surface-quiet); color: var(--ink-soft); }
-.score.is-weak { background: var(--surface-quiet); color: var(--muted); }
+.score.is-possible {
+  background: var(--surface-quiet);
+  color: var(--ink-soft);
+  border: 1px solid var(--hair-strong);
+}
+.score.is-weak {
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--hair-strong);
+}
 
 /* Both are display:block on purpose. As inline spans they rendered on one
    line with no separator, so the employer ran straight into the role title

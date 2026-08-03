@@ -55,10 +55,16 @@ This split is the whole design.
 The same posting arrives on two boards and on two mornings. Without a key, Tuesday's import
 silently resets Monday's triage.
 
-1. If `url` is present, the key is the URL **normalised**: lowercased, query string and fragment
-   stripped, trailing slash removed.
-2. Otherwise the key is `company|title|location`, each part lowercased, punctuation removed and
-   whitespace collapsed.
+Two keys are computed for every record and a row matches on **either**, because one key alone was not
+enough in practice.
+
+1. The URL **normalised**: lowercased, query string and fragment stripped, trailing slash removed.
+2. `company|title`, each part lowercased, punctuation removed and whitespace collapsed.
+
+The second key exists because the agent has no memory of which board it used yesterday, so the same
+posting arrives from an aggregator under a different URL and the URL key alone lets it in as a new
+row. **`location` is not part of the key**: an aggregator rewrites `New York, NY` as
+`New York, New York` or `New York, NY (Hybrid)`, and including it forked one job into four rows.
 
 ## Merge policy on re-import
 
@@ -79,7 +85,12 @@ than the schema, because losing a real opportunity to a missing enum value would
 failure than showing it with a default.
 
 - **Rejected**, and reported by row number: not an object, no `title`, no `company`, or a
-  `score` that is not an integer from 0 to 100.
+  `score` that is not an integer from 0 to 100. A numeric string such as `"91"` is **accepted** and
+  coerced, because `Number()` runs before the integer check.
+- **Warned about, and this one matters**: any of `status`, `hidden` or `notes` present at all. The
+  merge ignores them for a row already on the board, but for a **new** row they are read as starting
+  values, so a digest carrying `"hidden": true` lands a strong role invisible. That used to happen
+  silently. It is now reported per field, per row.
 - **Coerced, and reported as a warning**: an unrecognised `remote` becomes `unknown`, a `band`
   that disagrees with `score` is corrected, a non-http `url` is dropped, a missing `rationale`
   is flagged.

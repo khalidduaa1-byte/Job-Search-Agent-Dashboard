@@ -85,6 +85,25 @@ Two things worth knowing:
 The digest arrives as the routine's output rather than as email, so it is read in the routines
 dashboard and the JSON block is copied from there into **Import digest**.
 
+### What tells you a morning went wrong
+
+Almost nothing, and that is worth knowing rather than discovering. The triggers API records only
+`last_fired_at`: no exit status, no error surface, no archive of the digest. A push notification fires
+identically for a good morning and a hallucinated one, so it confirms a run happened and nothing more.
+
+Three failures are the ones the prompts are most carefully written to prevent, and all three are
+invisible from outside the session: the authorization filter not running, so the digest looks great
+and every role is one she cannot legally start; invented postings; and the Friday roundup guessing at
+what she has actioned.
+
+So the digest carries its own tell, and it is worth one glance:
+
+- **The routine's first line** says whether it could fetch the four prompt files and whether web
+  search worked. A run that could not read the rubric says so instead of scoring from memory.
+- **The "what the filters dropped" line.** If it is missing, or reads zero every day, the step 0
+  filters are not running. On a real morning against a US-only, New-York-or-remote, May-2027-onward
+  brief, that number is never zero.
+
 ## Running the dashboard
 
 It needs to be served over http, not opened as a file, because the sample-data button uses

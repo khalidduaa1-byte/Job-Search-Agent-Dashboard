@@ -90,7 +90,10 @@ eq('derived stat tiles',
   await page.$$eval('.stat-n', (n) => n.map((x) => x.textContent)), ['8', '4', '3', '4']);
 eq('five rows to action, three already in the pipeline',
   (await page.textContent('#result-count')).trim(), '5 to action, 3 already in your pipeline');
-eq('the jobs chip counts the latest report', await page.textContent('#latest-count'), '8');
+/* The chip counts what ARRIVED, not what was seen. Sample data is a first
+   import so all eight are new, and #latest-seen is empty. */
+eq('the jobs chip counts what arrived today', await page.textContent('#latest-count'), '8');
+eq('and says nothing extra when everything is new', await page.textContent('#latest-seen'), '');
 /* The hero card is a recommendation, so it must skip roles already actioned.
    Lumina is the highest score on the sample board at 96 and is already applied;
    Halyard at 93 is the best thing she can act on today. This used to read
@@ -324,6 +327,25 @@ const fencedReport = await page.textContent('#import-report');
 await page.click('#import-cancel');
 ok('a markdown code fence is stripped rather than rejected',
   /1 added, 2 updated/.test(fencedReport), fencedReport);
+
+/* Trailing prose after the closing fence, and a four-backtick fence. Markdown
+   uses four whenever the content itself contains a fence, and the prompt files
+   do. Both used to fail with "unexpected non-whitespace character". */
+for (const [label, payload] of [
+  ['trailing prose after the fence',
+    '```json\n' + JSON.stringify(digest) + '\n```\n\nPaste that into the dashboard. Good luck.'],
+  ['a four-backtick fence',
+    '````json\n' + JSON.stringify(digest) + '\n````'],
+]) {
+  await page.click('#import-open');
+  await page.fill('#import-txt', payload);
+  await page.click('#import-run');
+  await page.waitForSelector('#import-report:not([hidden])');
+  const r = await page.textContent('#import-report');
+  await page.click('#import-cancel');
+  ok(label + ' still imports', /updated/.test(r) && !/not valid JSON/.test(r), r.slice(0, 120));
+}
+
 const prefixed = 'Paste into the dashboard:\n\n' + JSON.stringify(digest);
 await page.click('#import-open');
 await page.fill('#import-txt', prefixed);
@@ -333,6 +355,49 @@ const prefixedReport = await page.textContent('#import-report');
 await page.click('#import-cancel');
 ok('leading prose before the array is tolerated',
   /0 added, 3 updated/.test(prefixedReport), prefixedReport);
+
+/* -- An import carrying a human-owned field is reported ------------
+   The merge ignores these for a row already on the board, but for a NEW row
+   they are read as defaults, so a digest with "hidden": true landed a strong
+   role invisible and nothing said so.
+
+   This section resets, so it goes AFTER every assertion that depends on the
+   running import count above. Putting it in the middle made the next
+   assertion measure a freshly seeded board, which is exactly the kind of
+   ordering coupling reset() exists to avoid. */
+console.log('\nHuman-owned fields in a digest');
+await reset(page);
+const offSpec = [{
+  title: 'Off Spec Role', company: 'Overreaching Agent Co', location: 'New York, NY',
+  remote: 'hybrid', source: 'greenhouse', url: 'https://example-boards.test/offspec/1',
+  apply_url: 'https://example-boards.test/offspec/1/apply', posted: '2026-08-01',
+  score: 95, rationale: 'Strong on paper, but the agent also sent hidden and status.',
+  signal: 'employer board page active', resume_tailored: false,
+  hidden: true, status: 'closed', notes: 'agent wrote this'
+}];
+const offSpecReport = await importJSON(page, offSpec);
+ok('an import carrying hidden is warned about', /carried "hidden"/.test(offSpecReport), offSpecReport);
+ok('an import carrying status is warned about', /carried "status"/.test(offSpecReport));
+ok('an import carrying notes is warned about', /carried "notes"/.test(offSpecReport));
+ok('the row still landed rather than being rejected', /1 added/.test(offSpecReport));
+ok('and it landed hidden, which is the point of the warning',
+  (await board(page)).find((r) => r.company === 'Overreaching Agent Co').hidden === true);
+
+/* -- A board where every row is hidden ----------------------------
+   The header used to read "Nothing imported yet" and "No reports yet" here,
+   which is false, and the empty state does not show either because it is gated
+   on the board being empty rather than the view being empty. Needs its own
+   board: the section above still has the eight visible sample rows. */
+await page.evaluate(() => localStorage.clear());
+await page.reload({ waitUntil: 'domcontentloaded' });
+await importJSON(page, offSpec);
+eq('an all-hidden board says so rather than claiming nothing was imported',
+  await page.textContent('#best-company'), 'Everything is hidden');
+ok('and points at where the rows went',
+  (await page.textContent('#best-meta')).includes('Hidden roles'),
+  await page.textContent('#best-meta'));
+eq('the latest-report line does not claim there are no reports',
+  await page.textContent('#latest-date'), 'All hidden');
 
 /* -- The same posting from a second board -------------------------
    The agent has no memory of which board it used yesterday, so a role she has
@@ -359,6 +424,22 @@ const reboardReport = await importJSON(page, reboarded);
 ok('the same role from another board updates rather than adding',
   /0 added, 1 updated/.test(reboardReport), reboardReport);
 eq('the board did not grow', (await board(page)).length, 10);
+
+/* An aggregator rewrites the location as well as the URL, which is the case
+   that actually happens. "New York, NY" against "New York, New York" against
+   "New York, NY (Hybrid)" are three strings for one place, and each one used to
+   land a fresh row at status new, putting an applied role back in the list. */
+for (const loc of ['New York, New York', 'New York, NY (Hybrid)', 'NEW YORK NY']) {
+  const variant = [Object.assign({}, reboarded[0], {
+    location: loc,
+    url: 'https://example-aggregator.test/v/' + encodeURIComponent(loc)
+  })];
+  const r = await importJSON(page, variant);
+  ok('a rewritten location does not fork the row: ' + loc, /0 added/.test(r), r.slice(0, 90));
+}
+eq('still ten rows after three location variants', (await board(page)).length, 10);
+eq('and it is still applied',
+  (await board(page)).find((x) => x.company === 'Halyard Compute').status, 'applied');
 eq('and it did not come back into the daily list', await rowIds(page), listAfterApply);
 eq('its applied status survived',
   (await board(page)).find((r) => r.company === 'Halyard Compute').status, 'applied');
@@ -376,14 +457,20 @@ const briefText = readFileSync(await briefDl.path(), 'utf8');
 ok('brief filename is dated', /^agent-brief-\d{4}-\d{2}-\d{2}\.md$/.test(briefDl.suggestedFilename()),
   briefDl.suggestedFilename());
 ok('brief lists an applied role to skip', /Lumina Systems \| AI Deployment Manager \| applied/.test(briefText));
+ok('and carries its url, so the agent can match on something an aggregator cannot mangle',
+  /applied \| https:\/\//.test(briefText), briefText.split('\n').slice(0, 8).join(' / '));
 ok('brief lists a hidden role to skip', /Pinebrook Logistics .* \| hidden/.test(briefText));
 ok('brief lists the interviewing role to skip', /Northwind AI .* \| interviewing/.test(briefText));
 ok('brief does not tell the agent to skip an actionable role',
   !/Halyard Compute \| Deployment Strategist \| (applied|hidden|interviewing)/.test(briefText));
 ok('brief names the unactioned 90-plus role for the Friday roundup',
   /93 \| Halyard Compute/.test(briefText), briefText.slice(-300));
+/* Split on the section heading itself, not on a phrase. Splitting on
+   "not actioned" broke as soon as the skip section grew a comment containing
+   the same words, which made the assertion measure the wrong half of the file. */
 ok('brief excludes actioned roles from the unactioned list',
-  briefText.split('not actioned')[1].indexOf('Lumina') === -1);
+  briefText.split('## Scored 90 plus')[1].indexOf('Lumina') === -1,
+  briefText.split('## Scored 90 plus')[1]);
 
 /* -- Export -------------------------------------------------------- */
 console.log('\nExport');

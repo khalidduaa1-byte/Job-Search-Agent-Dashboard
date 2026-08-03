@@ -207,6 +207,19 @@ support, and do not add a UI that lets the two disagree.
 - **Headless Chrome clamps its window to about 500px wide.** `--window-size=390,x` crops instead
   of reflowing, which looks exactly like a horizontal-overflow bug. Test mobile by loading the
   page in a 390px-wide **iframe**.
+- **`vercel.json` takes no comments, and an unknown key fails the whole deploy.** Vercel validates
+  the file against a strict schema and rejects additional properties, so a `"_comment"` inside the
+  `headers` entry errored every deploy from the moment it was added. The failure is quiet in the worst
+  way: production keeps serving the **last deploy that built**, so the site is up, looks fine, and is
+  simply weeks out of date. That presented as an empty board and a 404 on a digest that was provably
+  committed to `main`, and it cost an afternoon of debugging the import path, which was never broken.
+  Explanations for anything in `vercel.json` go here, not in the file. **After a change to
+  `vercel.json` or `.vercelignore`, check the deployment actually built** rather than assuming a green
+  site means a green deploy: `curl -sI <site>/app.js` and confirm the content matches `main`.
+- **The `no-store` header on `/data/digests/(.*)` is load-bearing.** Without it the CDN hands back
+  this morning's `index.json` from before the routine committed: she opens the site at 08:05, the
+  digest landed at 08:00, and the board shows nothing, which reads as broken code rather than a cache.
+  A digest file is immutable once written, but a corrected re-push has to win, so it applies to both.
 - **Greps prove nothing about what renders.** Finish in a real browser.
 
 ## Verifying a change

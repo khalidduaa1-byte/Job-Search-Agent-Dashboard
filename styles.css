@@ -466,6 +466,46 @@ summary:focus-visible, .restore:focus-visible {
   color: var(--muted);
 }
 
+/* Worth a look ------------------------------------------------------
+   Sits between the LATEST REPORT strip and the rows, because an import that
+   rejected a row has to be in the same glance as the results it produced. The
+   accent edge and the warm ground are the same pair the dialog report uses, so
+   it reads as the same voice rather than an error state. */
+.notice {
+  margin-top: 4px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  background: var(--warn-soft);
+  border: 1px solid var(--hair-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.notice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.notice-list {
+  list-style: none;
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.notice-list li { padding-left: 14px; position: relative; }
+.notice-list li + li { margin-top: 7px; }
+.notice-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 /* Right rail ------------------------------------------------------- */
 .rail { display: flex; flex-direction: column; gap: 14px; }
 .card {
@@ -482,6 +522,7 @@ summary:focus-visible, .restore:focus-visible {
   line-height: 1.55;
   color: var(--muted);
 }
+.rail-btn { margin-top: 10px; width: 100%; }
 
 .pipe { list-style: none; margin-top: 12px; }
 .pipe li {

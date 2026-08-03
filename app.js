@@ -15,6 +15,7 @@
   var KEY = 'jsd.board.v1';
   var SEEN_KEY = 'jsd.digests.v1';
   var TOKEN_KEY = 'jsd.token.v1';
+  var NOTICE_KEY = 'jsd.notices.v1';
 
   /* The digest token, and what it does and does not protect.
 
@@ -168,26 +169,31 @@
       .replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
   }
 
-  /* A seniority word is additive in exactly the way an aggregator's suffix is, so
-     the subset test above cannot tell "Associate Solutions Consultant" from a
-     retitled repost of "Solutions Consultant". Measured on the 2026-08-03 digest:
-     two genuinely separate Figma reqs at different levels collapsed into one row,
-     9 postings imported as 8, and the more senior one lost its URL to the
-     associate one. Losing a real opportunity silently is the worse failure, and
-     unlike the location case there is no upside to trade for it.
+  /* A word that only ever marks a rank, never a different job.
 
-     Refuse on ANY extra seniority token, not only when every extra token is one.
-     A rewriting aggregator bolts on location and arrangement, never a level, so
-     "Associate Solutions Consultant - New York" against "Solutions Consultant"
-     has extra tokens associate, new and york, and is still two different jobs.
-     Requiring all the extras to be seniority words would merge that case and
-     leave the bug half fixed.
+     The subset rule cannot tell "Solutions Consultant" retitled from
+     "Associate Solutions Consultant", a real second posting one grade down.
+     Measured on the 2026-08-03 digest: nine rows landed eight, because Figma's
+     Associate Solutions Consultant merged into Solutions Consultant and one
+     genuine opportunity left the board without a word. Seniority is the one
+     case where the extra token changes the job rather than decorating it, so
+     when it is the ONLY difference the two rows stay apart.
 
-     "manager" is deliberately absent. It is a core role word in this search, not
-     a level, and every Tier 1 deployment title carries it. */
-  var SENIORITY = ['associate', 'assoc', 'junior', 'jr', 'senior', 'snr', 'sr',
-                   'staff', 'principal', 'lead', 'head', 'director', 'vp',
-                   'intern', 'i', 'ii', 'iii', 'iv'];
+     Deliberately narrow. Anything that is not on this list still merges, so an
+     aggregator's "- New York" or "(Remote)" suffix is caught exactly as before,
+     and the rule that a role she applied to must not come back is untouched.
+
+     A rank present on one side is enough on its own, and it does not have to be
+     the ONLY difference. That was the first reading and it left the bug half
+     fixed: an aggregator rewrites the associate posting as "Associate Solutions
+     Consultant - New York", the extra tokens are associate, new and york, not
+     every one of them is a rank, and the two grades merged again. Measured
+     against the 2026-08-03 digest, which is the case that found this. The
+     asymmetry is the point: an aggregator adds location and arrangement, never a
+     grade, so a lone rank token is the signal that these are two jobs. */
+  var RANKS = ['associate', 'assistant', 'junior', 'jr', 'senior', 'snr', 'sr', 'staff',
+               'principal', 'lead', 'head', 'director', 'vp', 'intern',
+               'i', 'ii', 'iii', 'iv'];
 
   function looseMatch(rec, other) {
     if (!companyOf(rec) || companyOf(rec) !== companyOf(other)) return false;
@@ -199,11 +205,12 @@
     /* Guard against a one-word title swallowing everything at that employer. */
     if (shorter.length < 2) return false;
     if (!shorter.every(function (t) { return longer.indexOf(t) !== -1; })) return false;
-    /* Subset holds, so this is a repost unless the difference is a level. A
-       seniority word present on one side only is the signal that it is not. */
-    return !longer.some(function (t) {
-      return shorter.indexOf(t) === -1 && SENIORITY.indexOf(t) !== -1;
-    });
+
+    var extra = longer.filter(function (t) { return shorter.indexOf(t) === -1; });
+    if (extra.some(function (t) { return RANKS.indexOf(t) !== -1; })) {
+      return false;
+    }
+    return true;
   }
 
   /* Both keys, so a row matches on either.
@@ -297,6 +304,70 @@
       /* Out of quota. Say nothing here: save() already warns, and the cost is a
          duplicate import next load rather than lost data. */
     }
+  }
+
+  /* The import record --------------------------------------------------
+     What an import found wrong has to outlive the import.
+
+     merge() already produces an itemised account of every rejected row, every
+     coerced field and every retitled-repost match. On the manual path that
+     lands in the dialog, where she is looking. On the automatic path there is
+     no dialog: the account went to a toast that clears itself after four
+     seconds, and everything else was dropped on the floor. So a morning where
+     the digest arrived with a row rejected, or where two different roles merged
+     into one, was indistinguishable from a clean morning. The whole point of
+     the automatic path is that she does not have to be present when it runs,
+     which is exactly why its report cannot be the one that disappears.
+
+     So the report is persisted here and rendered in two places: the band above
+     the results, which only appears when something needs a look and can be
+     dismissed, and the rail card, which is the plain record of what last
+     happened and can bring a dismissed band back. Dismissal is keyed to the
+     report's own content hash, so tomorrow's import raises a fresh band rather
+     than inheriting yesterday's dismissal.
+
+     Kept out of jsd.board.v1 on purpose. This is commentary on an import, not
+     part of her pipeline, and it must not travel in an export or be restored
+     over the top of a newer one.
+  --------------------------------------------------------------------- */
+  function loadNotice() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(NOTICE_KEY));
+      if (!raw || !raw.report) return null;
+      return raw;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveNotice(rec) {
+    try {
+      localStorage.setItem(NOTICE_KEY, JSON.stringify(rec));
+    } catch (e) {
+      /* Out of quota. save() already warns about the board, which matters more
+         than the commentary on it. */
+    }
+  }
+
+  /* `label` is what the import is called in the interface: a date for one
+     digest, a count for several. `flags` is everything that wants a human. */
+  function recordNotice(source, label, flags, counts) {
+    var report = {
+      source: source,
+      label: label,
+      added: counts.added,
+      updated: counts.updated,
+      flags: flags
+    };
+    report.id = hashId(JSON.stringify(report));
+    var prev = loadNotice();
+    saveNotice({
+      version: 1,
+      report: report,
+      /* Carry a dismissal forward only when the report is byte-identical, which
+         is what a reload of an already-imported digest produces. */
+      dismissed: (prev && prev.dismissed === report.id) ? report.id : ''
+    });
   }
 
   /* Validation ----------------------------------------------------------
@@ -512,7 +583,8 @@
   function cache() {
     ['last-updated', 'report-label', 'best-company', 'best-meta', 's-inview', 's-strong',
      's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'latest-seen',
-     'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast'].forEach(function (id) {
+     'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast',
+     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show'].forEach(function (id) {
       el[id] = document.getElementById(id);
     });
   }
@@ -700,11 +772,59 @@
     }).join('');
   }
 
+  /* The import record, in two places and for two reasons. The band is the
+     interruption and only appears when there is something to act on. The rail
+     card is the record, always there once anything has been imported, so "did
+     this morning run at all" has an answer that does not depend on having been
+     at the screen when it did. */
+  function renderNotices() {
+    if (!el['notice'] || !el['import-log']) return;
+
+    var rec = loadNotice();
+    var rep = rec && rec.report;
+
+    if (!rep) {
+      el['notice'].hidden = true;
+      el['notice-show'].hidden = true;
+      el['import-log'].textContent = 'Nothing imported yet. When the morning digest lands, ' +
+        'what it changed is recorded here.';
+      return;
+    }
+
+    var arrived = rep.source === 'automatic'
+      ? 'arrived on its own'
+      : rep.source === 'file' ? 'from a file you dropped'
+      : rep.source === 'sample' ? 'sample data'
+      : 'pasted in';
+
+    var line = rep.label + ', ' + arrived + '. ' + rep.added + ' added, ' + rep.updated + ' updated.';
+    if (rep.updated) line += ' Updated rows kept the status, notes and hidden state you set.';
+    if (!rep.flags.length) line += ' Nothing flagged.';
+
+    el['import-log'].textContent = line;
+
+    var dismissed = rec.dismissed === rep.id;
+    var show = rep.flags.length > 0 && !dismissed;
+
+    el['notice'].hidden = !show;
+    el['notice-show'].hidden = !(rep.flags.length > 0 && dismissed);
+
+    if (show) {
+      el['notice-count'].textContent = rep.flags.length === 1
+        ? 'ONE THING WORTH A LOOK'
+        : rep.flags.length + ' THINGS WORTH A LOOK';
+      el['notice-list'].innerHTML = rep.flags.map(function (f) {
+        return '<li>' + esc(f) + '</li>';
+      }).join('');
+    }
+  }
+
   function render() {
     renderStats();
     renderHeader();
     renderRows();
     renderRail();
+    renderNotices();
   }
 
   /* Toast ---------------------------------------------------------- */
@@ -919,6 +1039,31 @@
       toast('Exported ' + board.length + ' rows, hidden ones included.');
     });
 
+    /* The worth-a-look band. Dismissing is a judgment on this report, so it is
+       keyed to the report's id: tomorrow's import raises a fresh band rather
+       than inheriting today's dismissal. The rail card keeps a way back, since a
+       rejected row that has been dismissed into nowhere is exactly the silent
+       loss this band exists to prevent. */
+    var dismiss = document.getElementById('notice-dismiss');
+    if (dismiss) {
+      dismiss.addEventListener('click', function () {
+        var rec = loadNotice();
+        if (!rec) return;
+        rec.dismissed = rec.report.id;
+        saveNotice(rec);
+        renderNotices();
+      });
+    }
+    if (el['notice-show']) {
+      el['notice-show'].addEventListener('click', function () {
+        var rec = loadNotice();
+        if (!rec) return;
+        rec.dismissed = '';
+        saveNotice(rec);
+        renderNotices();
+      });
+    }
+
     /* Sample data */
     var sample = document.getElementById('load-sample');
     if (sample) {
@@ -930,6 +1075,9 @@
           })
           .then(function (rows) {
             var res = merge(rows);
+            recordNotice('sample', 'Sample data',
+              res.rejected.map(function (m) { return 'rejected, ' + m; }).concat(res.warnings),
+              { added: res.added, updated: res.updated });
             render();
             toast('Loaded sample data: ' + res.added + ' added.');
           })
@@ -954,6 +1102,10 @@
       dlg.close();
     });
 
+    /* How the pending merge arrived, for the record only. Reset after each
+       import, because the next one is a paste until something says otherwise. */
+    var pendingSource = 'pasted';
+
     /* Read a digest file into the textarea, rather than importing it directly.
        She still sees what she is about to merge and still presses the button, so
        there is one import path and one confirmation step, not two. */
@@ -962,6 +1114,7 @@
       var reader = new FileReader();
       reader.onload = function () {
         txt.value = String(reader.result || '');
+        pendingSource = 'file';
         report.hidden = false;
         report.className = 'dlg-report ok';
         report.innerHTML = 'Loaded <b>' + esc(file.name) + '</b>. Press ' +
@@ -1038,6 +1191,14 @@
       }
 
       var res = merge(parsed);
+
+      /* Same record as the automatic path, so the rail card reflects the last
+         import whichever way it arrived, and a warning she closes the dialog on
+         is still there afterwards. */
+      recordNotice(pendingSource, prettyDate(todayISO()),
+        res.rejected.map(function (m) { return 'rejected, ' + m; }).concat(res.warnings),
+        { added: res.added, updated: res.updated });
+      pendingSource = 'pasted';
       render();
 
       var lines = '<b>' + res.added + ' added, ' + res.updated + ' updated, ' +
@@ -1130,10 +1291,11 @@
     var ok = results.filter(function (r) { return r.res; });
     var bad = results.filter(function (r) { return r.error; });
 
+    var added = ok.reduce(function (n, r) { return n + r.res.added; }, 0);
+    var updated = ok.reduce(function (n, r) { return n + r.res.updated; }, 0);
+    var rejected = ok.reduce(function (n, r) { return n + r.res.rejected.length; }, 0);
+
     if (ok.length) {
-      var added = ok.reduce(function (n, r) { return n + r.res.added; }, 0);
-      var updated = ok.reduce(function (n, r) { return n + r.res.updated; }, 0);
-      var rejected = ok.reduce(function (n, r) { return n + r.res.rejected.length; }, 0);
       /* Say what happened. An import that arrives in silence is
          indistinguishable from one that never ran, which was the whole problem
          with an empty board that gave no account of itself. */
@@ -1145,6 +1307,28 @@
       toast('Could not read ' + bad.length + ' digest' + (bad.length === 1 ? '' : 's') +
             ' (' + bad[0].date + ': ' + bad[0].error + '). It will be retried next time.');
     }
+
+    /* Persist the same account the manual path shows in its dialog. The toast
+       above is gone in four seconds and nobody is here to read it, which is the
+       point of an automatic import. Prefix each line with the digest date when
+       several landed at once, since "row 3" is meaningless without knowing
+       which morning it came from. */
+    var flags = [];
+    bad.forEach(function (r) {
+      flags.push('The ' + r.date + ' digest could not be read (' + r.error + '). Nothing from it ' +
+        'reached the board, and it was not marked as imported, so the next load will try again.');
+    });
+    ok.forEach(function (r) {
+      var tag = ok.length > 1 ? r.date + ', ' : '';
+      r.res.rejected.forEach(function (m) { flags.push(tag + 'rejected, ' + m); });
+      r.res.warnings.forEach(function (m) { flags.push(tag + m); });
+    });
+
+    recordNotice('automatic',
+      ok.length === 1 ? prettyDate(ok[0].date)
+        : ok.length ? ok.length + ' digests'
+        : 'No digest read',
+      flags, { added: added, updated: updated });
   }
 
   /* Boot ----------------------------------------------------------- */
@@ -1160,8 +1344,12 @@
        deliberately quiet, exactly as Load sample data already is. */
     autoImport()
       .then(function (results) {
-        if (results && results.length) render();
+        /* Record before rendering, not after. The other way round rendered the
+           rail card from the previous load's record, so a digest that had just
+           landed automatically was described as "nothing imported yet" by the
+           one panel whose job is to say that it had. */
         reportAutoImport(results);
+        if (results && results.length) render();
       })
       .catch(function () { /* no digests published, or offline */ });
   });

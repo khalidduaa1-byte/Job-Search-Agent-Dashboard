@@ -477,6 +477,24 @@ ok('but an aggregator suffix on the same title still merges',
   /0 added, 1 updated/.test(suffixReport), suffixReport.slice(0, 120));
 eq('so the board did not grow again', (await board(page)).length, seniorityBase + 2);
 
+/* A rank does not have to be the ONLY difference. Requiring that left the bug
+   half fixed: the aggregator rewrites the associate posting with a location
+   suffix, so the extra tokens are associate, new and york, not every one of them
+   is a rank, and the two grades merged again. This is the assertion that pins
+   the quantifier, so nobody relaxes it back to "only". */
+const rankPlusSuffix = [Object.assign({}, twoLevels[0], {
+  title: 'Associate Solutions Consultant - New York (Hybrid)',
+  url: 'https://example-aggregator.test/northwind/assoc-rewritten'
+})];
+const rankSuffixReport = await importJSON(page, rankPlusSuffix);
+ok('a rank plus a location suffix still does not merge into the senior row',
+  /0 added, 1 updated/.test(rankSuffixReport), rankSuffixReport.slice(0, 140));
+eq('and it matched the associate row rather than forking a third',
+  (await board(page)).length, seniorityBase + 2);
+eq('the two grades are still two distinct rows',
+  (await board(page)).filter((r) => r.company === 'Northwind AI'
+    && /solutions consultant/i.test(r.title)).length, 2);
+
 /* -- The agent brief ----------------------------------------------
    The scheduled task cannot read this board, so the brief is the only thing
    that stops it re-emitting a role she has actioned. Assert it names the

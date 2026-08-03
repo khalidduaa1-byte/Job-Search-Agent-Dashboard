@@ -389,6 +389,13 @@ summary:focus-visible, .restore:focus-visible {
 .pill.st-interviewing { background: var(--ok-soft); color: var(--ok); }
 .pill.st-offer { background: var(--accent-soft); color: var(--accent-deep); }
 .pill.st-closed { background: var(--surface-quiet); color: var(--muted-light); }
+/* Not a status. It says why a high score is not at the top of the list, so it
+   sits in the same row of chips and reads as a caveat rather than an error. */
+.pill.st-timing {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--hair-strong);
+}
 
 .chev {
   color: var(--muted-light);

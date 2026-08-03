@@ -38,9 +38,11 @@ authorization is **timing-gated**:
 - A posting that **states** a start date before that is **out of scope, not a low score**. A stated
   Summer or Fall 2026 start is not a record at all.
 - A posting that **states no start date** is a different case, and it is most of them. Presume an
-  immediate start, emit it, and take the 25-point deduction in `scoring-rubric.md`. It is worth
-  knowing about and worth a conversation. It is not something to apply to, and it must never be the
-  day's top pick.
+  immediate start, emit it, and set `"timing": "unstated"`. Score the fit as it actually is: the
+  dashboard applies the 25-point penalty to the ordering, so **do not subtract anything yourself**.
+  See the start-date section of `scoring-rubric.md` for why this is a field rather than a deduction.
+  It is worth knowing about and worth a conversation. It is not something to apply to, and it must
+  never be the day's top pick.
 - Long term she will need H-1B or equivalent. So when a posting asks about sponsorship, the answer
   is honest rather than optimistic. Do not apply a cap for a posting that is merely silent on
   sponsorship, and do not raise the subject where the posting does not.

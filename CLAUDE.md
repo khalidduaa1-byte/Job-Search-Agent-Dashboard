@@ -64,11 +64,29 @@ while chasing a feature.
    - **F-1, and authorization is timing-gated.** Full-time start dates on or after **May 2027**,
      internships **summer 2027**. The clean CPT window is summer 2027, after one full academic year.
      A **stated** earlier start is dropped. A posting stating **no** start date, which is most of
-     them, is emitted with a 25-point deduction: dropping those would empty the digest, and exempting
-     them would make the filter meaningless. Do not collapse those two cases back together, and if
-     you change one file here change all four: this rule lives in `prompts/profile.md`,
+     them, is emitted with `"timing": "unstated"`: dropping those would empty the digest, and
+     exempting them would make the filter meaningless. Do not collapse those two cases back together,
+     and if you change one file here change all four: this rule lives in `prompts/profile.md`,
      `prompts/scoring-rubric.md`, `prompts/daily-search.md` and this list, and it was inconsistent
      across them once.
+   - **The start-date penalty lives in the ordering, never in the score.** `score` is fit. `timing`
+     is whether she can start. `rank()` in `app.js` subtracts 25 for an `unstated` start when sorting,
+     the row shows a `start unstated` chip, and the top card prefers an actionable role, so an
+     unactionable posting still cannot head the morning.
+
+     **Do not put it back in the score.** It has been tried twice. A flat cap at 70 rendered fit of
+     90, 87, 84 and 79 all as exactly 70 and then sorted them alphabetically. Subtracting 25 fixed
+     the ordering and destroyed the meaning: almost no posting states a start date, so every row took
+     the hit, 75 became the arithmetic ceiling, the strong band became **unreachable**, all nine rows
+     of the 2026-08-03 digest rendered `weak`, the 90-plus tile read a permanent 0, the 90-plus
+     section of the Agent brief could never populate, and OpenAI's AI Deployment Manager was published
+     as **68** when it fits her at **93**. She read that as the search finding nothing good.
+   - **Posting age is not a filter and not a signal.** Confirm a posting is live, then ignore how long
+     it has been live. OpenAI and Anthropic hold the same titles open for months and refresh the
+     requisition rather than reposting, so `posted` dates at a lab run to months: 133 days for
+     OpenAI's deployment role, 122 for Anthropic's CSM, 283 for Harvey. Those are her top-tier
+     targets. A recency filter would delete the top of the board and keep the low scorers. Do not add
+     a staleness deduction and do not report posting age as a quality signal.
    - **Tier 4 roles are not sourced**: GTM Engineer at a lab, FDE or Applied AI Engineer against a
      real SWE bar, SWE, MLE.
 4. **Classify on the requirements section, not the title.** "Forward deployed" and "AI deployment"
@@ -143,6 +161,32 @@ Two consequences worth stating before someone "fixes" them:
 The key is versioned so a future schema change can migrate rather than clobber. If the record
 shape changes, bump to `jsd.board.v2` and write the migration.
 
+Three other keys, all of them deliberately **not** part of the board record, so none of them travels
+in an export or gets restored over the top of newer state: `jsd.digests.v1` is the import ledger,
+`jsd.token.v1` is the digest token, and `jsd.notices.v1` is the last import's report.
+
+## What an import flagged has to outlive the import
+
+`merge()` itemises every rejected row, every coerced field and every retitled-repost match. On the
+manual path that lands in the dialog, where she is already looking. **On the automatic path there is
+no dialog**, and the account used to go to a toast that clears itself after four seconds while
+everything else was dropped, so a morning that rejected a row looked exactly like a clean morning.
+An import that runs while nobody is watching is precisely the one whose report cannot be the one that
+disappears.
+
+So the report is persisted under `jsd.notices.v1` and rendered twice, and the split is the point:
+
+- **The band above the results** is the interruption. It appears **only** when something needs a look,
+  and it is dismissible. Dismissal is keyed to the report's own content hash, so tomorrow's import
+  raises a fresh band rather than inheriting today's dismissal.
+- **The rail card** is the record. It is there after any import, says how the import arrived, and
+  offers a way back to a dismissed band, because a rejected row dismissed into nowhere is the silent
+  loss the band exists to prevent.
+
+Do not make the band unconditional. A panel that says something every morning becomes wallpaper, and
+the morning it carries a real rejection is the morning it needs to be unusual. That is also why
+posting age is not in it: see the evergreen-requisition rule in non-negotiable 3.
+
 ## The dedup key
 
 Two keys, and a row matches on **either**:
@@ -177,16 +221,22 @@ what the board will **accept**.
 
 - **Rejected**, reported by row number: not an object, no `title`, no `company`, or a `score`
   that is not an integer from 0 to 100.
-- **Coerced and reported as a warning**: an unknown `remote` becomes `unknown`, a `band` that
-  disagrees with `score` is corrected (score wins, always), a non-http `url` is dropped, a
-  missing `rationale` is flagged.
+- **Coerced and reported as a warning**: an unknown `remote` becomes `unknown`, an unknown `timing`
+  becomes `unknown`, a `band` that disagrees with `score` is corrected (score wins, always), a
+  non-http `url` is dropped, a missing `rationale` is flagged.
 
 Losing a real opportunity to a missing enum value would be a worse failure than showing it with
 a default. A bad morning from the model should produce a loud itemised report, not a silently
-damaged board.
+damaged board. That report is now kept rather than toasted: see the import-record section above.
 
 `band` is **always derived from `score`** in `bandOf()`. Never store a band the score does not
 support, and do not add a UI that lets the two disagree.
+
+An **absent** `timing` becomes `unknown` **quietly**, with no warning, because a digest written before
+the field existed carries a score that already had the 25 subtracted. There is no way to tell which
+is which, so the row keeps its number and takes no ordering penalty rather than being penalised
+twice. The next morning's digest re-emits the same posting and corrects it. `unknown` is a migration
+state, not something an agent should ever emit.
 
 ## Gotchas, learned the hard way
 
@@ -225,7 +275,7 @@ support, and do not add a UI that lets the two disagree.
 ## Verifying a change
 
 There is no test framework and no dependency to add one. The check is a browser script, and the
-five that matter:
+seven that matter:
 
 1. Import the sample twice: the second time must report `0 added, 10 updated`.
 2. Set a status by hand, then re-import: **the status must survive.** This is rule 1 and it is
@@ -234,9 +284,17 @@ five that matter:
 4. Import a row with no title and a row with `score: 999`: both rejected by row number, the good
    row still lands.
 5. 390px iframe: `scrollWidth` must equal `clientWidth`.
+6. Import a `score: 93, timing: "unstated"` row next to a `score: 80, timing: "actionable"` one:
+   the **93 must display as 93**, the 90-plus tile must count it, and the **80 must sort above it**.
+   That is the whole fit-versus-actionability split in one assertion.
+7. Import a digest with a rejected row, then reload: **the report must still be on screen.** Dismiss
+   it, reload again, and it must stay dismissed with a way back in the rail.
 
 Run the app with `python3 -m http.server 8000`. Drive it with Playwright against the
 pre-installed Chromium rather than downloading one.
+
+`tests/week.mjs` fixtures carry **no** `timing` on purpose, so the five-day simulation doubles as the
+migration check: a board of pre-`timing` rows must order by score alone and take no penalty.
 
 ## Two stages, kept separate
 

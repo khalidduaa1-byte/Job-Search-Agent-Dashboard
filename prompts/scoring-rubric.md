@@ -1,7 +1,12 @@
 # The scoring rubric
 
-A score is a claim about fit. It has to mean the same thing on Monday as it does on Thursday,
-or the ordering in the dashboard is noise and the 90-plus count on the stat row is meaningless.
+A score is a claim about fit, and **only** about fit. It has to mean the same thing on Monday as it
+does on Thursday, or the ordering in the dashboard is noise and the 90-plus count on the stat row is
+meaningless.
+
+Whether she can **start** is a separate field, `timing`, and it never touches the score. Folding the
+two together is the single mistake this rubric has made most often, and the start-date section
+explains what it cost. One number cannot answer both "how good is this" and "can she take it".
 
 Read `profile.md` first. Score against what is actually in it.
 
@@ -27,8 +32,22 @@ Drop the posting entirely, before scoring, when any of these is true:
    office.** She cannot relocate to a third city mid-programme, so there is no version of this she
    can take. Where the company does have a New York office, emit it with the constraint named: it is
    a relationship, not an application.
-6. **It was posted or last reposted more than 14 days ago**, or **you could not open it and confirm
-   it exists.**
+6. **You could not open it and confirm it exists.** Confirmed live today is what matters.
+
+### Posting age is not evidence, because the labs run evergreen requisitions
+
+The 14-day window is how you **find** new postings. It is **not** a filter on what survives, and an
+older `posted` date is not a reason to drop or penalise anything.
+
+OpenAI and Anthropic keep the same titles open more or less permanently and refresh the same
+requisition rather than reposting it, so their `posted` dates run to months. Measured on the
+2026-08-03 digest: OpenAI's AI Deployment Manager at 133 days, Anthropic's Customer Success Manager at
+122, Harvey at 283. Those are her **top-tier targets**, and a recency filter would have deleted the
+entire top of the board while leaving the low scorers behind.
+
+So: **confirm it is live, then ignore how long it has been live.** Do not add a staleness deduction,
+do not flag old postings as suspicious, and do not report posting age as a quality signal. A long-open
+req at a lab is a standing opening, not a dead one.
 
 ### The start date, which is the hard case
 
@@ -37,26 +56,41 @@ immediate start**. Read literally against constraint 2 that would drop almost ev
 in the market, which is useless. Read loosely it lets everything through, which defeats the filter.
 Neither is right, so:
 
-- **Full-time, no stated start date: emit it, and subtract 25.** Presume an immediate start, because
-  that is what it means. The rationale must say `start date unstated, presume immediate, so this is
-  pipeline rather than an application`.
-
-  **Subtract, do not cap.** A flat cap at 70 was tried and it was wrong: four well-fitting postings
-  with raw scores of 90, 87, 84 and 79 all rendered as exactly 70 and then sorted alphabetically by
-  company, so the board could no longer rank the thing it exists to rank. A deduction preserves the
-  fit ordering underneath. The maximum possible score is 100, so minus 25 also guarantees an
-  unstated-start role can never reach the strong band, which is the other thing the cap was for.
+- **Full-time, no stated start date: emit it, score the fit, and set `"timing": "unstated"`.**
+  Presume an immediate start, because that is what it means. The rationale must say `start date
+  unstated, presume immediate, so this is pipeline rather than an application`. **Do not touch the
+  score for this.** The board applies the penalty itself, to the ordering only.
 - **Full-time, stated start in or after May 2027**, or aimed at 2027 graduates, or explicitly
-  flexible on start: **fully actionable, no cap.** These are the roles the search exists to find,
-  and they are what should reach the strong band.
+  flexible on start: **fully actionable.** Set `"timing": "actionable"`. These are the roles the
+  search exists to find, and they are what should reach the strong band.
 - **Internship or co-op, summer 2027: fully actionable.** Earlier: drop.
 - **Part-time or contract during term:** actionable only at **15 to 20 hours per week or fewer**, and
   it needs ISSO signoff, so say so in the rationale. Above 20 hours a week during term, **drop**:
   constraint 3 in `profile.md` makes it a conflict she cannot resolve.
 
-The point of the cap rather than a drop is that the daily top pick and the tailored resume go to a
-role she can actually start. A presumed-immediate-start role is worth knowing about and worth a
-conversation. It is not worth her morning at the top of the list.
+#### Why this is a field and not a deduction, which it was twice before
+
+Both earlier versions put the start-date penalty **inside the score**, and both broke the board.
+
+A flat **cap at 70** went first: four postings with raw fit of 90, 87, 84 and 79 all rendered as
+exactly 70 and then sorted alphabetically by company, so the board could no longer rank the thing it
+exists to rank.
+
+**Subtracting 25** fixed the ordering and broke the meaning. Almost no posting states a start date,
+so almost every row took the same hit: the published 2026-08-03 digest scored nine roles and every
+one rendered `weak`, the 90-plus tile read 0, and OpenAI's AI Deployment Manager, which fits her at
+**93**, was published as **68**. With 25 inside the score the arithmetic ceiling is 75 and the strong
+band is **unreachable**, so the entire band vocabulary and the 90-plus threshold in the Agent brief
+were dead. She read that as the search finding nothing good, every single day.
+
+The penalty was only ever about **order**: the top pick and the tailored resume must go to a role she
+can actually start. Order is now the only thing it changes. `score` is fit, on its own scale, and
+`timing` carries the actionability. The board subtracts 25 when sorting, shows a `start unstated`
+chip on the row, and prefers an actionable role for the top card. So an unactionable role still
+cannot outrank one she can start, and a 93 is still visible as a 93.
+
+**So: never re-apply this to `score`.** If the top of the board looks wrong, fix the ordering, not
+the number.
 
 ### Work authorization, precisely
 
@@ -260,9 +294,10 @@ set above a role's ceiling does nothing, and two of these used to be in exactly 
 - **A non-actionable location: cap at 75.** On-site outside New York at a company that does have a
   New York office. It is a relationship, not an application, and it must not outrank a role she can
   take.
-- **Full-time with no stated start date: subtract 25**, which is a deduction rather than a cap and is
-  applied before the caps. Presumed immediate start. See the start-date section above. This is the
-  most frequently applied adjustment in the whole rubric, because most postings state no date.
+- **Full-time with no stated start date: no cap and no deduction.** Set `"timing": "unstated"` and
+  leave the score alone. This is the most frequent case in the whole rubric, because most postings
+  state no date, which is exactly why putting it inside the score flattened every morning to `weak`.
+  See the start-date section above.
 - **Requires 8 or more years in the exact function: cap at 65.**
 - **Rules out future visa sponsorship: cap at 40**, and say so in the rationale. Read the work
   authorisation section above first: "must be authorised to work in the US" is **not** this.

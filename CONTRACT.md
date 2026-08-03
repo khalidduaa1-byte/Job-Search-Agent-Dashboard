@@ -11,11 +11,11 @@ Nineteen fields exist on a record **on the board**. The agent emits **twelve** o
 seven are not the agent's to send: three belong to the human and four are derived or assigned by the
 dashboard, and the ownership table below is the authority on which is which.
 
-The dashboard never branches on a missing key, so the agent emits **all twelve of its own fields on
+The dashboard never branches on a missing key, so the agent emits **all thirteen of its own fields on
 every record**, even when a value is empty or unknown.
 
-The exact twelve: `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`, `posted`,
-`score`, `rationale`, `signal`, `resume_tailored`.
+The exact thirteen: `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`, `posted`,
+`score`, `timing`, `rationale`, `signal`, `resume_tailored`.
 
 | Field | Type | Owner | Notes |
 | --- | --- | --- | --- |
@@ -30,7 +30,8 @@ The exact twelve: `title`, `company`, `location`, `remote`, `source`, `url`, `ap
 | `posted` | date | agent | `YYYY-MM-DD`, or `""` when the posting does not say |
 | `first_seen` | date | dashboard | First import that contained this posting |
 | `last_seen` | date | dashboard | Most recent import that contained it |
-| `score` | integer | agent | 0 to 100. See `prompts/scoring-rubric.md` |
+| `score` | integer | agent | **Fit, 0 to 100, and only fit.** See `prompts/scoring-rubric.md`. No start-date penalty inside it |
+| `timing` | enum | agent | `actionable`, `unstated`, `unknown`. Whether she can start, which is a separate axis from fit. The dashboard subtracts 25 when **ordering** an `unstated` row, never from the score |
 | `band` | enum | dashboard | Derived from `score`: `strong` at 90 and above, `possible` 70 to 89, `weak` below 70. The agent may emit it, but `score` wins and any disagreement is reported |
 | `rationale` | string | agent | One sentence on why it could fit. No hedging, no filler |
 | `signal` | string | agent | The evidence that the search is live, for example `employer greenhouse page active, reposted 2026-07-28` |
@@ -44,7 +45,7 @@ The exact twelve: `title`, `company`, `location`, `remote`, `source`, `url`, `ap
 This split is the whole design.
 
 - **The agent owns** `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`,
-  `posted`, `score`, `rationale`, `signal` and `resume_tailored`. Named rather than given as a range,
+  `posted`, `score`, `timing`, `rationale`, `signal` and `resume_tailored`. Named rather than given as a range,
   because "`title` through `signal`" spanned `first_seen` and `last_seen` in the table above and so
   contradicted the dashboard-owned line below it. It may overwrite these on
   every import.
@@ -76,7 +77,7 @@ Keep the human's state, refresh the agent's fields.
 | On import | Behaviour |
 | --- | --- |
 | Key not on the board | Insert. `status` defaults to `new`, `hidden` to `false`, `notes` to `""`. `first_seen` and `last_seen` set to today |
-| Key already on the board | Update `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`, `posted`, `score`, `band`, `rationale`, `signal`, `resume_tailored`. Bump `last_seen`. **Leave `status`, `hidden`, `notes` and `first_seen` untouched** |
+| Key already on the board | Update `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`, `posted`, `score`, `band`, `timing`, `rationale`, `signal`, `resume_tailored`. Bump `last_seen`. **Leave `status`, `hidden`, `notes` and `first_seen` untouched** |
 | Row fails validation | Reject that row, report it, and import the rest |
 
 A rejected row is never partially applied.
@@ -88,8 +89,8 @@ is non-empty**. An agent that omits a rationale on Tuesday does not blank the on
 because an empty field is almost always a gap in this morning's output rather than a statement that
 the old value was wrong.
 
-`score`, `band`, `title`, `company`, `location`, `remote` and `source` are assigned unconditionally,
-since the agent always emits them and a change is a real change.
+`score`, `band`, `timing`, `title`, `company`, `location`, `remote` and `source` are assigned
+unconditionally, since the agent always emits them and a change is a real change.
 
 `resume_tailored` is also assigned unconditionally, and that is the point: it used to be or-ed with
 the existing value, so once true it stayed true forever and the "Tailored resume sent" badge
@@ -132,6 +133,7 @@ human pastes:
     "apply_url": "https://boards.greenhouse.io/luminasystems/jobs/4820193#app",
     "posted": "2026-07-24",
     "score": 96,
+    "timing": "unstated",
     "rationale": "Post-sales adoption ownership for an enterprise AI platform, which is the closest match to the deployment-manager track and to the field rollout she has already run.",
     "signal": "employer greenhouse page active, reposted 2026-07-28",
     "resume_tailored": true
@@ -141,6 +143,13 @@ human pastes:
 
 `status`, `hidden` and `notes` are deliberately absent from that payload. That absence is the
 contract working.
+
+`score` is `96` and `timing` is `unstated`, and those two facts do not fight. The role fits her at 96
+and the posting does not say when it starts, so the board ranks it as a 71 and displays it as a 96
+with a `start unstated` chip. An earlier version of this contract had the agent publish `71`, which
+lost the 96 permanently: nothing downstream could recover it, every row in a real digest took the
+same hit, and the strong band became arithmetically unreachable. **Fit and actionability are two
+fields because they are two questions.**
 
 `band` is absent too, and used to be present here while `prompts/daily-search.md` said to omit it.
 The dashboard always derives it from `score`, so emitting it can only create a disagreement to

@@ -66,8 +66,11 @@ Cover, in this order:
    - **Start dates on or after May 2027** for full-time, summer 2027 for an internship. She is F-1
      and the clean CPT window is summer 2027. A **stated** Summer or Fall 2026 start is not a low
      score, it is not a record. A posting that **states no start date at all**, which is most of
-     them, is emitted with the 25-point deduction in `scoring-rubric.md` rather than dropped.
-   - Posted or reposted within the last 14 days.
+     them, is emitted with `"timing": "unstated"` and its fit score untouched. The dashboard applies
+     the 25-point penalty to the ordering. Do not subtract it yourself.
+   - Confirmed live. The 14-day window is how you find postings, not a filter on what survives:
+     OpenAI and Anthropic hold the same titles open for months and refresh rather than repost, so an
+     old `posted` date at a lab is a standing req and not a stale one. See `scoring-rubric.md`.
    - Re-emitting a posting already on the board is fine. The dashboard merges on the posting URL
      and reports it as updated rather than duplicating it, and it never overwrites her triage.
 
@@ -109,14 +112,13 @@ Take the highest-scoring posting. Tailor `resume/master-resume.md` for it using
 If nothing scored 80 or above, do not tailor anything. Say so in the email in one line. A
 tailored resume for a 62 is wasted work and it teaches her to ignore the attachment.
 
-**Measure the 80 against the fit score before the start-date deduction**, and after every other cap.
-Most postings state no start date, so measuring after the deduction would mean tailoring nothing on a
-normal morning, and step 4 would quietly stop happening while the README still claimed it ran. The
-deduction is a statement about actionability, not about fit, and a strong-fit role is worth a tailored
-resume ready for when it reopens.
+`score` is fit and carries no start-date penalty, so the 80 is measured against it directly. This
+used to need a paragraph of explanation, because the penalty was inside the score and measuring after
+it would have meant tailoring nothing on a normal morning. It is now one number with one meaning.
 
-Every other cap does count against the 80. A role capped at 60 for a PM-title screen is not a
-tailoring target, because that cap is about her odds, not about timing.
+Every cap does count against the 80. A role capped at 60 for a PM-title screen is not a tailoring
+target, because that cap is about her odds rather than about timing. An `unstated` start is not a
+reason to skip tailoring: a strong-fit role is worth a tailored resume ready for when it opens.
 
 Say in the email which one it was and whether it is actionable today, so the attachment never implies
 a deadline that does not exist.
@@ -194,6 +196,7 @@ One object per posting, with exactly these fields:
     "apply_url": "https://<direct application url>",
     "posted": "2026-07-24",
     "score": 96,
+    "timing": "unstated",
     "rationale": "One sentence, naming the overlap and the gap.",
     "signal": "employer board page active, reposted 2026-07-28",
     "resume_tailored": true
@@ -208,7 +211,11 @@ Field rules, which the dashboard enforces on import:
 - `source` names where you found it: `greenhouse`, `ashby`, `lever`, `adzuna`, `linkedin`,
   `company_site`.
 - `posted` is `YYYY-MM-DD`, or `""` when the posting does not say. Do not estimate it.
-- `score` is an integer from 0 to 100. Omit `band`; the dashboard derives it.
+- `score` is an integer from 0 to 100 and is **fit only**. Omit `band`; the dashboard derives it.
+- `timing` is `actionable` when the start date works for her, `unstated` when a full-time posting
+  gives no date, which is the common case. **Never bake the 25-point penalty into `score`.** The
+  board subtracts it when ordering and shows a chip. Doing it twice put every role in the weak band
+  and pinned the 90-plus count at 0.
 - **Never emit `status`, `hidden`, or `notes`.** Those are hers. An import that sets them would
   overwrite her triage, and the dashboard is built to ignore them for exactly that reason.
 

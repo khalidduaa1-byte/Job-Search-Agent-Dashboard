@@ -57,6 +57,26 @@
   }
   var STATUSES = ['new', 'saved', 'applied', 'interviewing', 'offer', 'closed'];
   var REMOTES = ['onsite', 'hybrid', 'remote', 'unknown'];
+
+  /* Whether she can act on the role now, which is a separate axis from how well
+     it fits. See TIMING_PENALTY below for why the two had to be pulled apart. */
+  var TIMINGS = ['actionable', 'unstated', 'unknown'];
+
+  /* An unstated start date must not put a role at the top of the morning, but it
+     must not be confused with a bad fit either.
+
+     The rubric used to subtract 25 from the score itself. That kept the ordering
+     honest and made the number meaningless: OpenAI's AI Deployment Manager fits
+     her at 93 and was published as 68, every posting in the digest took the same
+     hit because almost none state a start date, so all nine rendered "weak", the
+     90-plus tile read 0, and the whole band vocabulary died. With the deduction
+     inside the score, 90 was unreachable by arithmetic and 75 was the ceiling.
+
+     The penalty was only ever about ORDER, so it is applied to order alone.
+     `score` is fit. `timing` says whether she can start. Sorting subtracts this
+     for an unstated start, so an unactionable role still cannot outrank an
+     actionable one, which is the entire reason the deduction existed. */
+  var TIMING_PENALTY = 25;
   var PIPELINE = ['saved', 'applied', 'interviewing', 'offer'];
 
   /* Once you have applied, the role is not something to action tomorrow
@@ -393,6 +413,18 @@
       warnings.push('remote "' + raw.remote + '" is not a known value, set to unknown');
     }
 
+    /* Coerced, not rejected, and quietly when absent. A digest written before
+       timing existed carries scores that already had the 25 subtracted, and
+       guessing which is which is not possible, so an old row keeps its number
+       and is marked unknown rather than being silently re-penalised in the sort.
+       Tomorrow's digest re-emits the same posting and corrects it. */
+    var timing = TIMINGS.indexOf(raw.timing) === -1 ? 'unknown' : raw.timing;
+    if (raw.timing && timing !== raw.timing) {
+      warnings.push('timing "' + raw.timing + '" is not one of actionable, unstated or ' +
+                    'unknown, so it was set to unknown and this role is not ordered as ' +
+                    'either. Check the start date on the posting.');
+    }
+
     var band = bandOf(score);
     if (raw.band && raw.band !== band) {
       warnings.push('band "' + raw.band + '" disagrees with score ' + score + ', corrected to ' + band);
@@ -424,6 +456,7 @@
       posted: /^\d{4}-\d{2}-\d{2}$/.test(raw.posted) ? raw.posted : '',
       score: score,
       band: band,
+      timing: timing,
       rationale: String(raw.rationale || '').trim(),
       signal: String(raw.signal || '').trim(),
       resume_tailored: raw.resume_tailored === true
@@ -493,7 +526,7 @@
           remote: rec.remote, source: rec.source, url: rec.url,
           apply_url: rec.apply_url, posted: rec.posted,
           first_seen: today, last_seen: today,
-          score: rec.score, band: rec.band, rationale: rec.rationale,
+          score: rec.score, band: rec.band, timing: rec.timing, rationale: rec.rationale,
           signal: rec.signal, resume_tailored: rec.resume_tailored,
           status: rec._status, hidden: rec._hidden, notes: rec._notes
         });
@@ -514,6 +547,7 @@
         cur.posted = rec.posted || cur.posted;
         cur.score = rec.score;
         cur.band = rec.band;
+        cur.timing = rec.timing;
         cur.rationale = rec.rationale || cur.rationale;
         cur.signal = rec.signal || cur.signal;
         /* Assigned, not or-ed. The agent emits this boolean on every record, so
@@ -564,8 +598,17 @@
       return (r.company + ' ' + r.title + ' ' + r.rationale + ' ' + r.location + ' ' + r.source)
         .toLowerCase().indexOf(q) !== -1;
     }).sort(function (a, b) {
-      return b.score - a.score || a.company.localeCompare(b.company);
+      return rank(b) - rank(a) || b.score - a.score || a.company.localeCompare(b.company);
     });
+  }
+
+  /* Order by fit, less the timing penalty. This is the only place the 25 points
+     are applied, and applying them here rather than to `score` is what lets the
+     board show a 93 as a 93 while still refusing to put a role she cannot start
+     above one she can. Score breaks ties within a rank so the fit ordering
+     survives underneath, which is what the flat cap destroyed. */
+  function rank(r) {
+    return r.score - (r.timing === 'unstated' ? TIMING_PENALTY : 0);
   }
 
   /* Render --------------------------------------------------------- */
@@ -582,6 +625,10 @@
   function renderStats() {
     var vis = visible();
     el['s-inview'].textContent = vis.length;
+    /* 90 and above, on fit. This tile read 0 every single day while the penalty
+       lived inside the score, because 75 was then the arithmetic ceiling for the
+       vast majority of postings and the strong band could not be reached at all.
+       A number that cannot move is not a statistic, it is a dead pixel. */
     el['s-strong'].textContent = vis.filter(function (r) { return r.score >= 90; }).length;
     el['s-applied'].textContent = vis.filter(function (r) {
       return r.status === 'applied' || r.status === 'interviewing' || r.status === 'offer';
@@ -631,12 +678,15 @@
        says something true rather than going blank, and label it. */
     var pool = todays.length ? todays : visible();
     var actionable = pool.filter(function (r) { return DONE.indexOf(r.status) === -1; });
+    /* rank(), not score, for the same reason the list uses it: the top pick and
+       the tailored resume are supposed to go to a role she can actually start. */
     var best = (actionable.length ? actionable : pool)
-      .slice().sort(function (a, b) { return b.score - a.score; })[0];
+      .slice().sort(function (a, b) { return rank(b) - rank(a) || b.score - a.score; })[0];
     if (best) {
       el['best-company'].textContent = best.company;
       el['best-meta'].textContent = [best.title, best.location || best.remote,
                                     best.score + ' match score',
+                                    best.timing === 'unstated' ? 'start date unstated' : '',
                                     DONE.indexOf(best.status) === -1 ? '' : 'already ' + best.status]
                                     .filter(Boolean).join(' · ');
     } else if (board.length) {
@@ -696,6 +746,14 @@
             '<span class="row-title">' + esc(r.title) + '</span>' +
           '</span>' +
           '<span class="row-evi">' + esc(r.signal || r.location) + '</span>' +
+          /* The reason a 93 is not at the top. Without it the sort order looks
+             arbitrary: the number says this is the best fit on the board and
+             something else is above it, with nothing on screen explaining why. */
+          (r.timing === 'unstated'
+            ? '<span class="pill st-timing" title="The posting states no start date, so it is ' +
+              'presumed immediate and ordered below roles you can actually start. Pipeline ' +
+              'rather than an application.">start unstated</span>'
+            : '') +
           '<span class="pill st-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
           (applyUrl
             ? '<a class="row-apply" href="' + esc(applyUrl) + '" target="_blank" rel="noopener"' +
@@ -711,6 +769,8 @@
             '<span>Arrangement <b>' + esc(r.remote) + '</b></span>' +
             '<span>Source <b>' + esc(r.source) + '</b></span>' +
             '<span>Posted <b>' + esc(r.posted || 'not stated') + '</b></span>' +
+            '<span>Start date <b>' + (r.timing === 'actionable' ? 'works for you'
+              : r.timing === 'unstated' ? 'not stated' : 'not assessed') + '</b></span>' +
             '<span>First seen <b>' + esc(r.first_seen) + '</b></span>' +
             '<span>Last seen <b>' + esc(r.last_seen) + '</b></span>' +
             (r.resume_tailored ? '<span><b>Tailored resume sent</b></span>' : '') +
@@ -961,11 +1021,15 @@
         lines.push('- nothing yet');
       }
       lines.push('');
-      lines.push('## Scored 90 plus and not actioned. This is the Friday roundup list.');
+      lines.push('## Scored 90 plus on fit and not actioned. This is the Friday roundup list.');
+      lines.push('# The score is fit, with no start-date penalty inside it. "start unstated" means');
+      lines.push('# the posting gave no start date, so it is pipeline rather than an application.');
       if (openStrong.length) {
         openStrong.forEach(function (r) {
           lines.push('- ' + r.score + ' | ' + r.company + ' | ' + r.title +
-                     ' | ' + r.status + ' | first seen ' + r.first_seen);
+                     ' | ' + r.status +
+                     (r.timing === 'unstated' ? ' | start unstated' : '') +
+                     ' | first seen ' + r.first_seen);
         });
       } else {
         lines.push('- nothing outstanding');

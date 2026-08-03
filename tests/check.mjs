@@ -104,8 +104,18 @@ eq('best opportunity skips a role already applied to',
 ok('best opportunity meta carries role, place and score',
   (await page.textContent('#best-meta')) === 'Deployment Strategist · New York, NY · 93 match score',
   await page.textContent('#best-meta'));
-eq('rows are ordered by score, highest first',
-  await page.$$eval('.score', (n) => n.map((x) => x.textContent)), ['93', '88', '84', '78', '72']);
+/* Ordered by fit less the start-date penalty, then by fit.
+
+   Not by score alone, which is what this asserted while the penalty lived inside
+   the number. The sample deliberately mixes timing so the rule is exercised:
+   Alder's 78 is actionable and so ranks above Harborline's 88 and Cobalt's 84,
+   both of which state no start date and are therefore ranked at 63 and 59.
+   Underneath that, fit still orders, which is what the old flat cap destroyed. */
+eq('rows are ordered by fit less the start-date penalty, then by fit',
+  await page.$$eval('.score', (n) => n.map((x) => x.textContent)), ['93', '78', '88', '84', '72']);
+eq('and the ones ranked below an actionable row are the ones with no start date',
+  await page.$$eval('.row', (n) => n.map((r) => !!r.querySelector('.st-timing'))),
+  [false, false, true, true, true]);
 eq('hidden roles are in the rail, not the list',
   await page.$$eval('#hidden-list li', (n) => n.length), 2);
 eq('pipeline counts', await page.$$eval('.pipe-n', (n) => n.map((x) => x.textContent)),
@@ -605,9 +615,15 @@ eq('and a later digest that did not tailor clears it',
    site fill itself, and these are the assertions that make it safe to run on
    every single page load.
 
-   Needs a separate origin serving data/digests, since the repo's own index is
-   empty by design. AUTO_BASE points at it; without it these checks are skipped
-   rather than silently passing. */
+   Needs a separate origin serving its own data/digests fixture. AUTO_BASE points
+   at it; without it these checks are skipped rather than silently passing.
+
+   **Do not point AUTO_BASE at the repo.** It used to be safe, because the repo's
+   own digest index was empty by design. It is not any more: real published
+   digests live under data/digests/<token>/ now, so aiming AUTO_BASE at the repo
+   makes these checks measure whatever the routine last committed and they fail
+   with counts that look like a code fault. Serve a copy of index.html, app.js
+   and styles.css alongside a fixture digest instead. */
 console.log('\nAuto-import');
 if (!process.env.AUTO_BASE) {
   console.log('  skip  set AUTO_BASE to a site serving data/digests to run these');
@@ -695,6 +711,184 @@ if (!process.env.AUTO_BASE) {
   eq('a malformed index leaves the board intact', (await board(auto)).length, 3);
   ok('and the page still works', await auto.isVisible('.row'));
   await auto.close();
+}
+
+/* -- Fit and actionability are two axes ----------------------------
+   The start-date penalty used to be subtracted from `score`. That put every row
+   in the weak band on a real digest, made 75 the arithmetic ceiling, pinned the
+   90-plus tile at 0 and published OpenAI's 93 as a 68. The penalty is about
+   ORDER, so it is applied to order only. These are the assertions that stop it
+   migrating back into the number. */
+console.log('\nFit versus actionability');
+{
+  const page = await browser.newPage();
+  const base = (o) => Object.assign({
+    title: 'Role', company: 'Co', location: 'New York, NY', remote: 'hybrid',
+    source: 'greenhouse', url: '', apply_url: '', posted: '2026-08-01',
+    score: 50, timing: 'unstated', rationale: 'why', signal: 'live',
+    resume_tailored: false }, o);
+
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+
+  await importJSON(page, [
+    base({ company: 'Alpha', score: 93, timing: 'unstated', url: 'https://a/1' }),
+    base({ company: 'Beta', score: 80, timing: 'actionable', url: 'https://b/1' }),
+    base({ company: 'Gamma', score: 60, timing: 'actionable', url: 'https://g/1' }),
+  ]);
+
+  const cos = () => page.$$eval('#rows .row-co', (n) => n.map((e) => e.textContent));
+
+  eq('a 93 fit is shown as 93, with no penalty inside the number',
+    (await page.$$eval('#rows .score', (n) => n.map((e) => e.textContent)))
+      .includes('93'), true);
+  eq('the 90-plus tile can actually count something',
+    await page.textContent('#s-strong'), '1');
+  ok('and the strong band is reachable at all',
+    (await page.$$eval('#rows .score', (n) => n.map((e) => e.className)))
+      .some((c) => c.includes('is-strong')));
+
+  eq('an actionable 80 outranks an unstated 93', (await cos())[0], 'Beta');
+  eq('but the unstated 93 still beats an actionable 60, so fit ordering survives',
+    (await cos())[1], 'Alpha');
+  eq('exactly one row is chipped as start-unstated',
+    (await page.$$('#rows .st-timing')).length, 1);
+  eq('the top card recommends the role she can start',
+    await page.textContent('#best-company'), 'Beta');
+
+  /* The penalty is 25 and no more. A 99 unstated ranks 74, which is above an
+     actionable 70: getting this wrong in either direction either buries every
+     strong role or stops the penalty mattering. */
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await importJSON(page, [
+    base({ company: 'High', score: 99, timing: 'unstated', url: 'https://h/1' }),
+    base({ company: 'Low', score: 70, timing: 'actionable', url: 'https://l/1' }),
+  ]);
+  eq('the ordering penalty is 25, so a 99 unstated still leads a 70 actionable',
+    (await cos())[0], 'High');
+
+  /* Coerced, never rejected. Losing a real opportunity to an enum would be the
+     worse failure, and an unrecognised value must not be treated as unstated,
+     because that penalises a role on a typo. */
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const rep = await importJSON(page,
+    [base({ company: 'Typo', score: 88, timing: 'someday', url: 'https://t/1' })]);
+  eq('an unrecognised timing is coerced, not rejected', (await board(page)).length, 1);
+  eq('and set to unknown rather than unstated',
+    (await board(page))[0].timing, 'unknown');
+  ok('and reported', /timing/.test(rep));
+
+  /* A digest written before the field existed carries a score that already had
+     the 25 taken off. There is no way to tell, so it keeps its number and is
+     marked unknown rather than being penalised a second time in the sort. */
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await importJSON(page, [{ title: 'Old', company: 'Legacy', score: 68, rationale: 'r' }]);
+  eq('a row predating timing keeps its score', (await board(page))[0].score, 68);
+  eq('and is marked unknown, so it is not re-penalised',
+    (await board(page))[0].timing, 'unknown');
+
+  /* Rule 1 again, against the new field. An import refreshes timing and score
+     and must still not touch her triage. */
+  await page.click('#rows .row summary');
+  await page.selectOption('#rows .row select[data-act="status"]', 'applied');
+  await page.waitForTimeout(150);
+  await importJSON(page,
+    [{ title: 'Old', company: 'Legacy', score: 91, timing: 'actionable', rationale: 'r2' }]);
+  eq('status survives an import that changes score and timing',
+    (await board(page))[0].status, 'applied');
+  eq('while score refreshes', (await board(page))[0].score, 91);
+  eq('and so does timing', (await board(page))[0].timing, 'actionable');
+
+  await page.close();
+}
+
+/* -- What an import flagged outlives the import --------------------
+   merge() has always itemised every rejection and coercion. On the automatic
+   path that account went to a toast and vanished, so a morning where a row was
+   rejected looked exactly like a clean one. It is persisted now. */
+console.log('\nThe import record');
+{
+  const page = await browser.newPage();
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+
+  await importJSON(page, [
+    { title: 'Fine', company: 'Acme', score: 91, remote: 'weird', band: 'weak', rationale: 'r' },
+    { company: 'No Title Inc', score: 50 },
+  ]);
+  await page.waitForTimeout(200);
+
+  ok('a flagged import raises the band', await page.isVisible('#notice'));
+  const items = () => page.$$eval('#notice-list li', (n) => n.map((e) => e.textContent));
+  ok('the rejected row is named by row number',
+    (await items()).some((t) => /row 2/.test(t) && /title/.test(t)));
+  ok('the coerced remote is reported', (await items()).some((t) => /remote/.test(t)));
+  ok('the corrected band is reported', (await items()).some((t) => /band/.test(t)));
+  ok('the rail card records how the import arrived',
+    /pasted in/.test(await page.textContent('#import-log')));
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  ok('and all of it survives a reload, which is the whole point',
+    await page.isVisible('#notice'));
+  ok('with its items intact', (await items()).length >= 3);
+
+  await page.click('#notice-dismiss');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  ok('a dismissal sticks across a reload', !(await page.isVisible('#notice')));
+  ok('and the rail offers a way back, so nothing is dismissed into nowhere',
+    await page.isVisible('#notice-show'));
+  await page.click('#notice-show');
+  ok('which works', await page.isVisible('#notice'));
+
+  /* Dismissal is keyed to the report, not to the board. Tomorrow's import must
+     raise its own band rather than inheriting today's dismissal. */
+  await page.click('#notice-dismiss');
+  await importJSON(page, [{ title: 'Later', company: 'Beta', score: 40, remote: 'nope', rationale: 'r' }]);
+  await page.waitForTimeout(200);
+  ok('a fresh report is not silenced by an older dismissal',
+    await page.isVisible('#notice'));
+
+  ok('and none of this commentary leaks into the board record',
+    !/flags|dismissed/.test(await page.evaluate(() => localStorage.getItem('jsd.board.v1'))));
+
+  await page.close();
+}
+
+/* -- Seniority is not a retitled repost ----------------------------
+   looseMatch merged "Solutions Consultant" into "Associate Solutions
+   Consultant" and a real second role left the board with nothing said. */
+console.log('\nSeniority does not merge');
+{
+  const page = await browser.newPage();
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const b2 = (t, u) => ({ title: t, company: 'Figma', location: 'New York, NY',
+    remote: 'hybrid', source: 'greenhouse', url: u, apply_url: u, posted: '2026-07-22',
+    score: 50, timing: 'unstated', rationale: 'r', signal: 's', resume_tailored: false });
+
+  await importJSON(page, [
+    b2('Solutions Consultant', 'https://figma.test/1'),
+    b2('Associate Solutions Consultant', 'https://figma.test/2'),
+  ]);
+  eq('two roles one grade apart stay two rows', (await board(page)).length, 2);
+
+  /* The rule stays narrow: a bolted-on location suffix must still merge, or the
+     applied-does-not-return guarantee weakens. */
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await importJSON(page, [b2('Solutions Consultant', 'https://figma.test/1')]);
+  await importJSON(page, [b2('Solutions Consultant - New York', 'https://figma.test/3')]);
+  eq('a retitled repost with a location suffix still merges', (await board(page)).length, 1);
+
+  await page.close();
 }
 
 await browser.close();

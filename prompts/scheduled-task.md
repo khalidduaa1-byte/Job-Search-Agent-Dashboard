@@ -17,14 +17,17 @@ So: UI, with the repo attached. Paste the text below into the prompt field.
 | Connectors | Gmail, only if you want it emailed. Both prompts work without it |
 | Notifications | push and email on, so a run that happens at all is visible |
 
-**Schedule.** Cron is UTC.
+**Schedule.** Cron is UTC, so it has to be converted, and it does not follow daylight saving.
 
 | Routine | Cron | Fires at |
 | --- | --- | --- |
-| Daily digest | `0 5 * * 1-4` | 9am Dubai, 1am New York |
-| Friday roundup | `0 5 * * 5` | same |
+| Daily digest | `0 12 * * 1-4` | **8am New York**, 4pm Dubai |
+| Friday roundup | `0 12 * * 5` | same |
 
-Change the hour to `9` when she is in New York: `0 9 * * 1-4` and `0 9 * * 5` is 5am Eastern.
+**Twice a year this drifts by an hour and nothing warns you.** `12:00` UTC is 8am Eastern during
+daylight time, which runs from mid-March to early November. Outside that window Eastern is UTC minus 5,
+so the same cron fires at 7am. To keep 8am through the winter, change it to `0 13 * * 1-4` and
+`0 13 * * 5` when the clocks go back.
 
 Four searches and one review, and **do not add weekend runs.** A weekend digest mostly re-emits
 Thursday's postings, and every import bumps `last_seen`, which is what the LATEST REPORT date and the

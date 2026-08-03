@@ -71,12 +71,12 @@ runs appear in the sessions list. Routines created by an agent's `create_trigger
 and their runs return a `cse_...` identifier rather than `session_...`, which does not appear to
 surface in the same place: three firings produced nothing visible.
 
-Two routines, both firing at 05:00 UTC:
+Two routines, both firing at **8am New York**, which is `12:00` UTC during daylight time:
 
 | Routine | Schedule | Reads |
 | --- | --- | --- |
-| `Job search: daily digest (Mon-Thu)` | `0 5 * * 1-4` | `prompts/daily-search.md` |
-| `Job search: Friday roundup` | `0 5 * * 5` | `prompts/weekly-roundup.md` |
+| `Job search: daily digest (Mon-Thu)` | `0 12 * * 1-4` | `prompts/daily-search.md` |
+| `Job search: Friday roundup` | `0 12 * * 5` | `prompts/weekly-roundup.md` |
 
 Each one reads its prompt, plus `prompts/profile.md`, `prompts/scoring-rubric.md` and
 `resume/master-resume.md`, straight from this repo, so **editing a prompt here changes what next
@@ -87,8 +87,9 @@ Two things worth knowing:
 
 - **Web search has to be on.** Without it the task cannot verify a posting exists, and the prompt
   tells it to drop anything it cannot open.
-- **05:00 UTC is 9am Dubai and 1am New York.** Change the hour to `11` when she moves, so it lands
-  at 7am Eastern rather than in the middle of the night.
+- **Cron is UTC and does not follow daylight saving.** `12:00` UTC is 8am Eastern from mid-March to
+  early November. Outside that window the same cron fires at 7am, so change it to `0 13` when the
+  clocks go back if 8am matters. Nothing warns you when this drifts.
 
 The digest arrives as the routine's output rather than as email, so it is read in the routines
 dashboard and the JSON block is copied from there into **Import digest**.

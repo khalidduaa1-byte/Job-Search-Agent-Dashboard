@@ -444,6 +444,39 @@ eq('and it did not come back into the daily list', await rowIds(page), listAfter
 eq('its applied status survived',
   (await board(page)).find((r) => r.company === 'Halyard Compute').status, 'applied');
 
+/* A seniority level is not a retitled repost -----------------------
+   The subset rule above catches an aggregator suffix, and a seniority word is
+   additive in exactly the same shape, so it used to catch those too. Measured on
+   the 2026-08-03 digest: Figma's "Solutions Consultant" and "Associate Solutions
+   Consultant" merged, 9 postings imported as 8, and the more senior req lost its
+   URL to the associate one. Losing a verified posting is the worst failure this
+   board has, so these two must stay separate while the suffix case still
+   merges. */
+console.log('\nSeniority is not a repost');
+const seniorityBase = (await board(page)).length;
+const twoLevels = ['Solutions Consultant', 'Associate Solutions Consultant'].map((title, i) => ({
+  title, company: 'Northwind AI', location: 'New York, NY', remote: 'hybrid',
+  source: 'greenhouse', url: 'https://example-boards.test/northwind/sc-' + i,
+  apply_url: 'https://example-boards.test/northwind/sc-' + i + '/apply',
+  posted: '2026-08-03', score: 50,
+  rationale: 'Two genuinely separate reqs at different levels.',
+  signal: 'employer board', resume_tailored: false
+}));
+const levelReport = await importJSON(page, twoLevels);
+ok('two seniority levels of one title import as two rows',
+  /2 added/.test(levelReport), levelReport.slice(0, 120));
+eq('so the board grew by both', (await board(page)).length, seniorityBase + 2);
+/* And the repost catch this rule exists for must still fire, on the same
+   employer, so the guard is proven narrow rather than simply disabled. */
+const suffixed = [Object.assign({}, twoLevels[0], {
+  title: 'Solutions Consultant - New York (Hybrid)',
+  url: 'https://example-aggregator.test/northwind/sc-rewritten'
+})];
+const suffixReport = await importJSON(page, suffixed);
+ok('but an aggregator suffix on the same title still merges',
+  /0 added, 1 updated/.test(suffixReport), suffixReport.slice(0, 120));
+eq('so the board did not grow again', (await board(page)).length, seniorityBase + 2);
+
 /* -- The agent brief ----------------------------------------------
    The scheduled task cannot read this board, so the brief is the only thing
    that stops it re-emitting a role she has actioned. Assert it names the

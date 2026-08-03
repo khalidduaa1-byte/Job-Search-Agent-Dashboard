@@ -168,6 +168,27 @@
       .replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
   }
 
+  /* A seniority word is additive in exactly the way an aggregator's suffix is, so
+     the subset test above cannot tell "Associate Solutions Consultant" from a
+     retitled repost of "Solutions Consultant". Measured on the 2026-08-03 digest:
+     two genuinely separate Figma reqs at different levels collapsed into one row,
+     9 postings imported as 8, and the more senior one lost its URL to the
+     associate one. Losing a real opportunity silently is the worse failure, and
+     unlike the location case there is no upside to trade for it.
+
+     Refuse on ANY extra seniority token, not only when every extra token is one.
+     A rewriting aggregator bolts on location and arrangement, never a level, so
+     "Associate Solutions Consultant - New York" against "Solutions Consultant"
+     has extra tokens associate, new and york, and is still two different jobs.
+     Requiring all the extras to be seniority words would merge that case and
+     leave the bug half fixed.
+
+     "manager" is deliberately absent. It is a core role word in this search, not
+     a level, and every Tier 1 deployment title carries it. */
+  var SENIORITY = ['associate', 'assoc', 'junior', 'jr', 'senior', 'snr', 'sr',
+                   'staff', 'principal', 'lead', 'head', 'director', 'vp',
+                   'intern', 'i', 'ii', 'iii', 'iv'];
+
   function looseMatch(rec, other) {
     if (!companyOf(rec) || companyOf(rec) !== companyOf(other)) return false;
     var a = titleTokens(rec);
@@ -177,7 +198,12 @@
     var longer = a.length <= b.length ? b : a;
     /* Guard against a one-word title swallowing everything at that employer. */
     if (shorter.length < 2) return false;
-    return shorter.every(function (t) { return longer.indexOf(t) !== -1; });
+    if (!shorter.every(function (t) { return longer.indexOf(t) !== -1; })) return false;
+    /* Subset holds, so this is a repost unless the difference is a level. A
+       seniority word present on one side only is the signal that it is not. */
+    return !longer.some(function (t) {
+      return shorter.indexOf(t) === -1 && SENIORITY.indexOf(t) !== -1;
+    });
   }
 
   /* Both keys, so a row matches on either.

@@ -1,0 +1,8 @@
+{
+  "name": "job-search-agent-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A local tracker for the opportunities a scheduled Claude task finds each morning, plus the prompts and data contract behind it.",
+  "license": "UNLICENSED",
+  "_note": "Metadata only. No dependencies, no scripts, nothing reads this."
+}

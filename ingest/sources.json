@@ -1,0 +1,49 @@
+{
+  "_comment": [
+    "The watchlist. Employer ATS boards first, aggregators second.",
+    "Reading an employer's own board is the highest-signal source there is: if the",
+    "posting is on the company's board today, the search is live. That is what the",
+    "`signal` field in CONTRACT.md is for.",
+    "To find a company's token, open their careers page and read the URL:",
+    "  job-boards.greenhouse.io/TOKEN     -> type greenhouse",
+    "  jobs.ashbyhq.com/TOKEN             -> type ashby",
+    "  jobs.lever.co/TOKEN                -> type lever",
+    "  apply.workable.com/TOKEN           -> type workable",
+    "  jobs.smartrecruiters.com/TOKEN     -> type smartrecruiters",
+    "UNVERIFIED: the tokens below are the conventional careers-page tokens for each",
+    "company, but they could NOT be confirmed against the live endpoints, because the",
+    "sandbox this file was written in blocks outbound requests to job-board hosts.",
+    "Run `python3 ingest/fetch_jobs.py --only greenhouse --only ashby` on your own",
+    "machine first: any token that is wrong prints a FAIL line with an HTTP 404 and",
+    "is skipped, so a bad guess costs you one line of output, not a broken run.",
+    "Fix or disable the failures, then trust the list.",
+    "Set enabled to false rather than deleting, so the watchlist stays readable.",
+    "See SOURCES.md for why LinkedIn and Indeed are not in this list."
+  ],
+
+  "sources": [
+    { "type": "ashby",      "token": "openai",       "company": "OpenAI",       "enabled": true },
+    { "type": "greenhouse", "token": "anthropic",    "company": "Anthropic",    "enabled": true },
+    { "type": "ashby",      "token": "cohere",       "company": "Cohere",       "enabled": true },
+    { "type": "greenhouse", "token": "databricks",   "company": "Databricks",   "enabled": true },
+    { "type": "ashby",      "token": "ramp",         "company": "Ramp",         "enabled": true },
+    { "type": "greenhouse", "token": "figma",        "company": "Figma",        "enabled": true },
+    { "type": "greenhouse", "token": "notion",       "company": "Notion",       "enabled": true },
+
+    { "type": "remotive",   "query": "product manager", "limit": 50, "enabled": true },
+    { "type": "arbeitnow",  "enabled": false },
+
+    {
+      "type": "adzuna",
+      "country": "us",
+      "query": "AI deployment OR forward deployed OR AI product manager",
+      "limit": 50,
+      "enabled": false,
+      "_note": [
+        "needs ADZUNA_APP_ID and ADZUNA_APP_KEY in the environment, free tier.",
+        "No `where` on purpose: country us with no city searches the whole US, which",
+        "is what we want. Add `where` only to narrow to one metro."
+      ]
+    }
+  ]
+}

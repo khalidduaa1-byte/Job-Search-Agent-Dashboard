@@ -1,0 +1,240 @@
+{
+  "_comment": [
+    "Weights for the deterministic keyword prescore in fetch_jobs.py.",
+    "This is a keyword match, not a judgment. It exists so the pipeline works with",
+    "no model in the loop, and so that when the agent does score a posting you have",
+    "something transparent to compare it against.",
+    "Points are additive. Title family and location take the single best match, in",
+    "array order, so the order of those two lists is load-bearing. Keywords and",
+    "penalties all apply. The total is clamped to 0 to 100.",
+    "Title 45 plus every keyword 50 plus location 12 is 107, so the clamp is",
+    "reachable on paper. It is not reachable in practice, because the keyword groups",
+    "are mutually unlikely: a real Tier 1 posting hits three or four of them and lands",
+    "in the eighties. If you ever see a run where many rows sit at exactly 100, the",
+    "clamp has started doing the scoring and the weights need cutting.",
+    "Tuned for the tiered target set in prompts/profile.md: Tier 1 deployment,",
+    "technical account management and solutions roles first, Tier 2 GTM and product",
+    "marketing next, Tier 3 product and analyst roles last, Tier 4 not sourced.",
+    "Geography is New York or remote-US, not any US city, because she is at Cornell",
+    "Tech in New York from August 2026 to May 2027. San Francisco scores 3, not 12.",
+    "Penalties are scanned against title, description AND location, which matters:",
+    "the out-of-scope penalty is written entirely in place names, so scanning only",
+    "the title and description let a London posting through with no penalty at all.",
+    "Every penalty here is a keyword heuristic and a backstop. The real filters are",
+    "in prompts/scoring-rubric.md step 0, which tells the agent to drop a non-US",
+    "posting, a start date before May 2027, and a Tier 4 engineering role outright.",
+    "Two of those the prescore cannot see at all: it cannot read a start date, and it",
+    "cannot tell a deployment role with a coding screen from one without unless the",
+    "words appear. That is what the agent is for."
+  ],
+
+  "title_families": [
+    {
+      "label": "deployment or forward-deployed title",
+      "points": 45,
+      "patterns": ["deployment manager", "deployment strategist", "forward deployed",
+                   "forward-deployed", "solutions architect", "implementation manager",
+                   "implementation consultant", "solutions consultant"]
+    },
+    {
+      "label": "AI product title",
+      "points": 42,
+      "patterns": ["ai product manager", "product manager, ai", "ai product",
+                   "technical product manager", "platform product manager"]
+    },
+    {
+      "label": "product title",
+      "points": 35,
+      "patterns": ["product manager", "product owner", "associate product manager",
+                   "product lead"]
+    },
+    {
+      "label": "post-sales or adoption title",
+      "points": 32,
+      "patterns": ["customer success", "post-sales", "enablement manager",
+                   "adoption manager", "onboarding manager", "account manager"]
+    },
+    {
+      "label": "solutions or sales engineering title",
+      "points": 30,
+      "patterns": ["solutions engineer", "sales engineer", "technical account manager",
+                   "customer engineer"]
+    },
+    {
+      "label": "go-to-market title",
+      "points": 26,
+      "_note": "Below post-sales and solutions on purpose. GTM is a target she asked for, but she has not held a GTM title: the adjacency is account management, renewals, QBRs and expansion. See the cap in prompts/scoring-rubric.md, which the agent applies and this keyword prescore cannot.",
+      "patterns": ["go-to-market", "go to market", "gtm", "partnerships", "partner manager",
+                   "business development", "revenue operations", "revenue strategy",
+                   "sales strategy", "commercial strategy", "sales operations"]
+    },
+    {
+      "label": "programme or project title",
+      "points": 24,
+      "patterns": ["program manager", "programme manager", "technical program manager",
+                   "project manager", "chief of staff"]
+    },
+    {
+      "label": "analyst title",
+      "points": 12,
+      "patterns": ["business analyst", "data analyst", "bi analyst",
+                   "business intelligence", "reporting analyst", "product analyst"]
+    }
+  ],
+
+  "keywords": [
+    {
+      "label": "adoption and rollout ownership",
+      "points": 8,
+      "patterns": ["drive adoption", "customer adoption", "rollout", "roll-out",
+                   "enablement", "onboarding customers", "time to value"]
+    },
+    {
+      "label": "embedded with customers",
+      "points": 8,
+      "patterns": ["embedded with", "on-site with customers", "customer-facing engineering",
+                   "deploy our", "work directly with customers"]
+    },
+    {
+      "label": "enterprise or strategic accounts, post-sales ownership",
+      "points": 8,
+      "_note": "One of the real positive signals. The word AI in a title is noise; this is not.",
+      "patterns": ["enterprise accounts", "strategic accounts", "post-sales", "book of business",
+                   "renewals", "quarterly business review", "customer health", "expansion",
+                   "net revenue retention"]
+    },
+    {
+      "label": "AI or model platform",
+      "points": 4,
+      "_note": "Cut from 6. The word AI carries close to no signal now, so these patterns are worth a little as company-shape evidence and nothing more. What separates a real fit from a title match is the work described: enterprise accounts, post-sales, adoption, non-technical end users.",
+      "patterns": ["large language model", " llm", "generative ai", "ai platform",
+                   "ai agents", "foundation model", "machine learning platform"]
+    },
+    {
+      "label": "data quality and validation",
+      "points": 6,
+      "patterns": ["data quality", "data validation", "data pipeline", "ingest",
+                   "deduplicat", "schema"]
+    },
+    {
+      "label": "decision support and analytics product",
+      "points": 5,
+      "patterns": ["decision support", "analytics product", "internal tooling",
+                   "operational reporting", "dashboards for"]
+    },
+    {
+      "label": "go-to-market",
+      "points": 4,
+      "patterns": ["go-to-market", "go to market", " gtm ", "revenue operations"]
+    },
+    {
+      "label": "retail or consumer goods domain",
+      "points": 4,
+      "patterns": ["retail", "beauty", "luxury", "consumer goods", "fmcg",
+                   "travel retail", "e-commerce"]
+    },
+    {
+      "label": "part-time or student-compatible",
+      "points": 3,
+      "patterns": ["part-time", "part time", "internship", "co-op", "contract"]
+    }
+  ],
+
+  "locations": [
+    {
+      "label": "New York",
+      "points": 12,
+      "patterns": ["new york", "nyc", "ny,", "brooklyn", "manhattan"]
+    },
+    {
+      "label": "remote in the United States",
+      "points": 12,
+      "patterns": ["remote, united states", "remote - us", "remote (us", "us remote",
+                   "remote usa", "remote, us"]
+    },
+    {
+      "label": "San Francisco, not actionable while enrolled",
+      "points": 3,
+      "_note": "Only worth tracking for relationship building, and only where the company has a New York office. The prescore cannot check for a New York office, so this band is deliberately low and the agent decides. See the geography section in prompts/scoring-rubric.md.",
+      "patterns": ["san francisco", "sf bay", "palo alto", "mountain view", "menlo park",
+                   "sunnyvale", "oakland, ca", ", ca"]
+    },
+    {
+      "label": "elsewhere in the United States",
+      "points": 5,
+      "_note": "Was 12, when the brief was any US city. It is now New York or remote-US, because she is at Cornell Tech in New York from August 2026 to May 2027 and cannot relocate to a third city mid-programme.",
+      "patterns": ["united states", "seattle", "austin", "boston", "chicago",
+                   "los angeles", "denver", "atlanta", "washington, dc",
+                   ", wa", ", tx", ", ma", ", il", ", co", ", ga"]
+    },
+    {
+      "label": "remote, geography not stated",
+      "points": 5,
+      "patterns": ["remote"]
+    }
+  ],
+
+  "penalties": [
+    {
+      "label": "outside the United States, out of scope",
+      "points": -60,
+      "patterns": ["dubai", "united arab emirates", "abu dhabi", "london",
+                   "united kingdom", "singapore", "bangalore", "berlin", "amsterdam",
+                   "toronto", "canada", "australia", "dublin", "paris", "tokyo",
+                   "sao paulo", "mexico city", "remote, europe", "remote (emea",
+                   "remote, apac"]
+    },
+    {
+      "label": "requires security clearance",
+      "points": -30,
+      "patterns": ["security clearance", "ts/sci", "must be a us citizen"]
+    },
+    {
+      "label": "coding screen, so this is the engineering flavour",
+      "points": -45,
+      "_note": "The disambiguation that matters. Forward deployed and AI deployment cover two different jobs under near-identical titles, and some manager-titled deployment roles smuggle in a coding screen. A keyword hit cannot read a requirements section, so this is a backstop: the real rule is in prompts/scoring-rubric.md step 0b, which tells the agent to classify on the requirements and drop the engineering version entirely.",
+      "patterns": ["coding challenge", "coding screen", "technical screen", "take-home",
+                   "take home assignment", "live coding", "leetcode", "system design interview",
+                   "pair programming exercise", "code review exercise"]
+    },
+    {
+      "label": "hard product manager title screen",
+      "points": -25,
+      "_note": "She has no PM title on record, so a hard years-as-a-PM screen makes the role low-probability whatever the fit. Deprioritise, do not drop: the agent caps it and flags the screen risk in the rationale.",
+      "patterns": ["3+ years as a product manager", "3+ years of product management",
+                   "4+ years of product management", "5+ years of product management",
+                   "5+ years as a product manager", "years of product management experience"]
+    },
+    {
+      "label": "requires existing US work authorization with no CPT or OPT accommodation",
+      "points": -45,
+      "_note": "F-1. See the hard constraints in prompts/profile.md. The agent drops these outright; the prescore can only push them down.",
+      "patterns": ["no visa sponsorship", "not able to sponsor", "unable to sponsor",
+                   "must have permanent us work authorization",
+                   "must be authorized to work in the united states without sponsorship",
+                   "without the need for sponsorship", "no sponsorship available"]
+    },
+    {
+      "label": "unpaid",
+      "points": -30,
+      "patterns": ["unpaid", "no compensation", "equity only"]
+    },
+    {
+      "label": "seniority well above her band",
+      "points": -15,
+      "patterns": ["10+ years", "12+ years", "15+ years", "vice president",
+                   "senior director", "head of product", "chief product"]
+    },
+    {
+      "label": "doctorate required",
+      "points": -12,
+      "patterns": ["phd required", "ph.d. required", "doctorate required"]
+    },
+    {
+      "label": "deep engineering specialism",
+      "points": -10,
+      "patterns": ["kubernetes", "distributed systems engineer", "compiler",
+                   "cuda", "kernel"]
+    }
+  ]
+}

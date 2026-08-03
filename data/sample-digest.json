@@ -1,0 +1,47 @@
+[
+  {
+    "title": "AI Deployment Manager",
+    "company": "Lumina Systems",
+    "location": "New York, NY",
+    "remote": "hybrid",
+    "source": "greenhouse",
+    "url": "https://example-boards.test/luminasystems/jobs/4820193?utm_source=digest",
+    "apply_url": "https://example-boards.test/luminasystems/jobs/4820193#app",
+    "posted": "2026-07-24",
+    "score": 97,
+    "band": "strong",
+    "rationale": "Reposted with an explicit adoption metric in the job description, which raises it above the rest of the strong band.",
+    "signal": "employer board page active, reposted 2026-07-30",
+    "resume_tailored": true
+  },
+  {
+    "title": "Deployment Strategist",
+    "company": "Halyard Compute",
+    "location": "New York, NY",
+    "remote": "onsite",
+    "source": "ashby",
+    "url": "https://example-boards.test/halyardcompute/postings/deployment-strategist",
+    "apply_url": "https://example-boards.test/halyardcompute/postings/deployment-strategist/apply",
+    "posted": "2026-07-29",
+    "score": 93,
+    "band": "strong",
+    "rationale": "Customer-facing deployment ownership at an infrastructure company, with the rollout and enablement half of the job stated explicitly.",
+    "signal": "new posting, first seen 2026-07-30",
+    "resume_tailored": false
+  },
+  {
+    "title": "Product Manager, Field Tools",
+    "company": "Meridian Field",
+    "location": "Remote, United States",
+    "remote": "remote",
+    "source": "lever",
+    "url": "https://example-boards.test/meridianfield/pm-field-tools",
+    "apply_url": "https://example-boards.test/meridianfield/pm-field-tools/apply",
+    "posted": "2026-07-28",
+    "score": 89,
+    "band": "possible",
+    "rationale": "Builds the tools a non-technical field team uses daily, which is the adoption problem she has already solved once, one point below the strong band on seniority.",
+    "signal": "employer board page active",
+    "resume_tailored": false
+  }
+]

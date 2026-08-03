@@ -1,0 +1,19 @@
+# Fetcher output. Contains real postings, and once you have run it, a de facto
+# record of what you are looking at. Keep it local.
+out/
+
+# Never commit the aggregator keys.
+.env
+.env.*
+
+__pycache__/
+*.pyc
+.DS_Store
+
+# Playwright for tests/check.mjs is installed ad hoc and is deliberately not a
+# dependency of this repo. See tests/README.md.
+# No trailing slash: a `node_modules/` pattern matches a directory but not a
+# symlink to one, and pointing a symlink at an install elsewhere is a normal way
+# to run these checks.
+node_modules
+package-lock.json

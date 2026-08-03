@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Search Agent &amp; Dashboard</title>
+<meta name="description" content="A local tracker for the opportunities the search agent finds each morning. Score, triage, and keep the search moving.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23C0603C'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='32' fill='%23FAF8F5' text-anchor='middle'%3EJ%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">J</span>
+      <span class="brand-name">Job Search Agent</span>
+    </div>
+    <div class="topmeta">
+      <span class="live"><span class="live-dot"></span>Local tracker</span>
+      <span class="topmeta-sep" aria-hidden="true"></span>
+      <span class="topmeta-txt">Last updated <b id="last-updated">never</b></span>
+      <button type="button" class="ghost" id="import-open">Import digest</button>
+      <button type="button" class="ghost" id="export">Export</button>
+    </div>
+  </header>
+
+  <!-- Report header -->
+  <section class="report">
+    <div class="report-main">
+      <p class="label accent" id="report-label">DAILY OPPORTUNITY REPORT</p>
+      <h1 class="display">Your next move,<br><em>in view.</em></h1>
+      <p class="standfirst">A considered shortlist of roles worth your attention, with the context to
+        prioritise well and a simple place to keep the search moving.</p>
+    </div>
+    <div class="report-best">
+      <p class="label">BEST OPPORTUNITY TODAY</p>
+      <p class="best-company" id="best-company">Nothing imported yet</p>
+      <p class="best-meta" id="best-meta">Import a digest to see the day&rsquo;s top match.</p>
+    </div>
+  </section>
+
+  <!-- Derived stat row -->
+  <section class="stats" aria-label="Board summary">
+    <div class="stat">
+      <span class="stat-n" id="s-inview">0</span>
+      <span class="label">ROLES IN VIEW</span>
+    </div>
+    <div class="stat">
+      <span class="stat-n" id="s-strong">0</span>
+      <span class="label">90+ MATCH</span>
+    </div>
+    <div class="stat">
+      <span class="stat-n" id="s-applied">0</span>
+      <span class="label">APPLIED TO</span>
+    </div>
+    <div class="stat">
+      <span class="stat-n" id="s-progress">0</span>
+      <span class="label">IN PROGRESS</span>
+    </div>
+  </section>
+
+  <div class="layout">
+
+    <!-- Results -->
+    <main class="results">
+      <div class="results-head">
+        <h2 class="serif">Daily results</h2>
+        <span class="results-count" id="result-count">0 opportunities</span>
+      </div>
+
+      <div class="controls">
+        <div class="search-wrap">
+          <span class="search-ic" aria-hidden="true">&#9906;</span>
+          <input type="search" id="q" placeholder="Search company, title, or focus area" aria-label="Search opportunities">
+        </div>
+        <select id="f-status" aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          <option value="new">New</option>
+          <option value="saved">Saved</option>
+          <option value="applied">Applied</option>
+          <option value="interviewing">Interviewing</option>
+          <option value="offer">Offer</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select id="f-score" aria-label="Filter by score">
+          <option value="all">All scores</option>
+          <option value="strong">90 and above</option>
+          <option value="possible">70 to 89</option>
+          <option value="weak">Below 70</option>
+        </select>
+        <button type="button" class="ghost" id="clear">Clear</button>
+      </div>
+
+      <div class="latest">
+        <div>
+          <p class="label">LATEST REPORT</p>
+          <p class="latest-date serif" id="latest-date">No reports yet</p>
+        </div>
+        <span class="jobs-chip"><b id="latest-count">0</b> JOBS</span>
+      </div>
+
+      <div id="rows"></div>
+
+      <div class="empty" id="empty" hidden>
+        <p class="empty-h serif">Nothing on the board.</p>
+        <p class="empty-p">Paste a morning digest with <b>Import digest</b>, or load the invented
+          sample data to see how the board behaves.</p>
+        <button type="button" class="solid" id="load-sample">Load sample data</button>
+      </div>
+    </main>
+
+    <!-- Right rail -->
+    <aside class="rail">
+      <div class="card">
+        <h3 class="serif">Your pipeline</h3>
+        <ul class="pipe" id="pipeline"></ul>
+      </div>
+      <div class="card">
+        <h3 class="serif">Hidden roles</h3>
+        <ul class="hidden-list" id="hidden-list"></ul>
+        <p class="rail-note" id="hidden-empty">Nothing hidden yet. Hiding a role keeps it here
+          rather than deleting it.</p>
+      </div>
+      <div class="card card-quiet">
+        <h3 class="serif">Where this data lives</h3>
+        <p class="rail-note">This board is stored in your browser only, under
+          <code>jsd.board.v1</code>. Nothing is uploaded. Use <b>Export</b> to keep a copy.</p>
+      </div>
+    </aside>
+
+  </div>
+
+  <footer class="foot">
+    <span>Job Search Agent &amp; Dashboard</span>
+    <span>The agent proposes. You decide.</span>
+  </footer>
+
+</div>
+
+<!-- Import dialog -->
+<dialog id="import-dlg" aria-labelledby="import-title">
+  <form method="dialog" class="dlg-form">
+    <h2 class="serif" id="import-title">Import a digest</h2>
+    <p class="dlg-p">Paste the JSON array from the morning email. Existing rows keep the status,
+      notes and hidden state you set. See <code>CONTRACT.md</code> for the merge rules.</p>
+    <textarea id="import-txt" rows="12" spellcheck="false" placeholder="[ { &quot;title&quot;: &quot;...&quot;, &quot;company&quot;: &quot;...&quot; } ]" aria-label="Digest JSON"></textarea>
+    <div class="dlg-report" id="import-report" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" class="ghost" id="import-cancel">Cancel</button>
+      <button type="button" class="solid" id="import-run">Validate and merge</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

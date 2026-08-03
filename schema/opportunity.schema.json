@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/khalidduaa1-byte/Job-Search-Agent-Dashboard/schema/opportunity.schema.json",
+  "title": "Opportunity",
+  "description": "One job opportunity as exchanged between the search agent and the dashboard. See CONTRACT.md for field ownership and the merge policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "company", "location", "remote", "source", "url", "score", "rationale"],
+  "$comment": "This schema is the agent's obligation: emit all of these. The dashboard is deliberately more tolerant than the schema, and rejects a row only when title, company or score is unusable, coercing the rest with a reported warning. Losing a real opportunity to a missing enum would be worse than showing it with a default. `band` is not required because the dashboard always derives it from `score`.",
+  "properties": {
+    "id": {
+      "description": "Stable hash of the dedup key. Owned by the dashboard; the agent may omit it.",
+      "type": "string"
+    },
+    "title": {
+      "description": "Role title exactly as posted.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "company": {
+      "description": "The employer, not the job board.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "location": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "remote": {
+      "enum": ["onsite", "hybrid", "remote", "unknown"]
+    },
+    "source": {
+      "description": "Where the posting was found. Free-form so a new adapter does not require a schema change.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "url": {
+      "description": "Canonical posting URL. Primary input to the dedup key.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "apply_url": {
+      "description": "Direct application link, or empty when there is no separate one. Anchored at both ends on purpose: an unanchored optional prefix matches every string, which is not validation.",
+      "type": "string",
+      "pattern": "^(https?://.*)?$"
+    },
+    "posted": {
+      "description": "YYYY-MM-DD, or empty when the posting does not say.",
+      "type": "string",
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+    },
+    "first_seen": {
+      "description": "Owned by the dashboard.",
+      "type": "string",
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+    },
+    "last_seen": {
+      "description": "Owned by the dashboard.",
+      "type": "string",
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+    },
+    "score": {
+      "description": "0 to 100. See prompts/scoring-rubric.md.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "band": {
+      "description": "Derived by the dashboard from score: strong >= 90, possible 70 to 89, weak < 70. If the agent emits a band that disagrees with the score, the score wins and the disagreement is reported.",
+      "enum": ["strong", "possible", "weak"]
+    },
+    "rationale": {
+      "description": "One sentence on why it could fit.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400
+    },
+    "signal": {
+      "description": "Evidence the search is live.",
+      "type": "string",
+      "maxLength": 200
+    },
+    "status": {
+      "description": "Human-owned. Never overwritten by an import.",
+      "enum": ["new", "saved", "applied", "interviewing", "offer", "closed"]
+    },
+    "hidden": {
+      "description": "Human-owned. Ruled out but retained.",
+      "type": "boolean"
+    },
+    "notes": {
+      "description": "Human-owned.",
+      "type": "string",
+      "maxLength": 2000
+    },
+    "resume_tailored": {
+      "type": "boolean"
+    }
+  }
+}

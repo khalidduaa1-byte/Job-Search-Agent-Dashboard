@@ -763,29 +763,39 @@
       '<details class="row" data-id="' + esc(r.id) + '">' +
         '<summary>' +
           '<span class="score is-' + esc(r.band) + '">' + r.score + '</span>' +
-          '<span>' +
+          '<span class="row-name">' +
             '<span class="row-co">' + esc(r.company) + '</span>' +
             '<span class="row-title">' + esc(r.title) + '</span>' +
           '</span>' +
           '<span class="row-evi">' + esc(r.signal || r.location) + '</span>' +
-          /* The reason a 93 is not at the top. Without it the sort order looks
-             arbitrary: the number says this is the best fit on the board and
-             something else is above it, with nothing on screen explaining why. */
-          (r.timing === 'unstated'
-            ? '<span class="pill st-timing" title="The posting states no start date, so it is ' +
-              'presumed immediate and ordered below roles you can actually start. Pipeline ' +
-              'rather than an application.">start unstated</span>'
-            : '') +
-          '<span class="pill st-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
-          (applyUrl
-            ? '<a class="row-apply" href="' + esc(applyUrl) + '" target="_blank" rel="noopener"' +
-              ' data-act="applylink" aria-label="Apply to ' + esc(r.title) + ' at ' +
-              esc(r.company) + ', opens in a new tab">Apply &#8599;</a>'
-            : '<span></span>') +
+          /* One wrapper, however many chips. The summary grid has a fixed cell
+             per element, so anything that varies per row has to vary inside a
+             cell rather than by adding a cell. Adding the timing chip as a
+             seventh child of a six-column grid is what pushed the chevron onto
+             a second grid row and squeezed Apply into the 18px chevron column. */
+          '<span class="row-actions">' +
+            /* The reason a 93 is not at the top. Without it the sort order looks
+               arbitrary: the number says this is the best fit on the board and
+               something else is above it, with nothing on screen explaining why. */
+            (r.timing === 'unstated'
+              ? '<span class="pill st-timing" title="The posting states no start date, so it is ' +
+                'presumed immediate and ordered below roles you can actually start. Pipeline ' +
+                'rather than an application.">start unstated</span>'
+              : '') +
+            '<span class="pill st-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
+            (applyUrl
+              ? '<a class="row-apply" href="' + esc(applyUrl) + '" target="_blank" rel="noopener"' +
+                ' data-act="applylink" aria-label="Apply to ' + esc(r.title) + ' at ' +
+                esc(r.company) + ', opens in a new tab">Apply &#8599;</a>'
+              : '') +
+          '</span>' +
           '<span class="chev" aria-hidden="true">&#9662;</span>' +
         '</summary>' +
         '<div class="row-body">' +
           '<p class="row-why">' + esc(r.rationale || 'No rationale was supplied for this one.') + '</p>' +
+          /* The collapsed band clamps the signal to two lines, so the full
+             string has to be readable somewhere once the row is open. */
+          (r.signal ? '<p class="row-signal">' + esc(r.signal) + '</p>' : '') +
           '<div class="row-facts">' +
             '<span>Location <b>' + esc(r.location || 'not stated') + '</b></span>' +
             '<span>Arrangement <b>' + esc(r.remote) + '</b></span>' +

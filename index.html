@@ -110,9 +110,11 @@
       <div id="rows"></div>
 
       <div class="empty" id="empty" hidden>
-        <p class="empty-h serif">Nothing on the board.</p>
-        <p class="empty-p">Paste a morning digest with <b>Import digest</b>, or load the invented
-          sample data to see how the board behaves.</p>
+        <p class="empty-h serif">Nothing on the board yet.</p>
+        <p class="empty-p"><b>This board never fills itself.</b> It lives in this browser only, so the
+          scheduled task cannot write to it and there is nothing to wait for. The morning digest ends
+          with a JSON block: paste that into <b>Import digest</b> and the roles appear here.</p>
+        <p class="empty-p">Want to see it working first? Load ten invented rows.</p>
         <button type="button" class="solid" id="load-sample">Load sample data</button>
       </div>
     </main>

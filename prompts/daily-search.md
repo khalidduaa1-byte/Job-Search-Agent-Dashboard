@@ -75,9 +75,29 @@ Cover, in this order:
 be quietly ignored, and ignoring it means the top-scored role of the day is regularly a coding loop.
 "AI" in a title is noise: score the work described.
 
-Aim for **8 to 15 postings**. Fewer is fine on a slow morning, and a morning where the filters drop
+Aim for **15 to 20 postings**. Fewer is fine on a slow morning, and a morning where the filters drop
 most of what you found is a real result worth reporting. Do not pad the list to hit a number: a
 short honest digest is the point of the exercise.
+
+**Reaching 15 means widening the sourcing, never loosening the filters.** This target was 8 to 15
+and it was raised, so read the next paragraph as part of the number rather than as advice.
+
+A higher floor is exactly the pressure that produces a padded digest, so when the morning comes up
+short the honest moves are, in order: read more employer boards, work the Tier 2 GTM family across
+**any technology company** rather than only AI-native ones per `profile.md`, and work Tier 3. The
+dishonest moves, which are what a number invites, are relaxing step 0, letting a Tier 4 engineering
+role through on the strength of its title, or inflating a score to fill the list. **A digest of 9
+real postings beats one of 18 where 9 were padding**, and a morning that reports 9 with the reason
+is a working search. Say the count and why it fell short.
+
+Two failures that cost a real morning, both of them sourcing rather than the market:
+
+- **A big board will not come back through a page fetcher.** OpenAI's board is over 11MB and 700
+  plus postings, and a 10MB fetch limit failed it silently. One role was surfaced instead of ten,
+  and two Tier 1 New York reqs were missed. Enumerate a large board with `curl` piped into a
+  parser, and use a page fetcher only for an individual posting.
+- **A watchlist of seven employers cannot produce fifteen roles.** If `ingest/sources.json` is
+  short, or a token 404s, that is the thing to report and fix, not a reason to pad.
 
 ## 2. Verify before you score
 

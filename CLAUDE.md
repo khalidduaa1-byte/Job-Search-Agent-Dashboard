@@ -221,6 +221,18 @@ support, and do not add a UI that lets the two disagree.
   digest landed at 08:00, and the board shows nothing, which reads as broken code rather than a cache.
   A digest file is immutable once written, but a corrected re-push has to win, so it applies to both.
 - **Greps prove nothing about what renders.** Finish in a real browser.
+- **A big employer board will not come back through a page fetcher.** OpenAI's Ashby board is over
+  11MB and more than 700 postings, and a 10MB fetch limit failed it **silently**. The morning run
+  fell back to a web search, surfaced 1 role instead of about 10, and missed two Tier 1 New York
+  reqs including `AI Deployment Manager - NYC`, which is the most on-target title in
+  `prompts/profile.md`. Enumerate a board with `curl` piped into a parser; use a page fetcher only
+  for an individual posting. The digest looked like a thin market and was a tooling failure.
+- **The watchlist is the ceiling on the digest.** `ingest/sources.json` had seven employers, and
+  two of those were broken: Notion's token was a Greenhouse token while Notion is on Ashby, so it
+  404d. Seven employers cannot produce a 15 to 20 role morning. When the count falls short, check
+  the watchlist before concluding the market is quiet, and note that for the **Tier 2 GTM family
+  any technology company counts**, so a watchlist of only AI-native companies starves that family
+  and Tier 3 entirely.
 
 ## Verifying a change
 

@@ -74,7 +74,17 @@ Six things get got wrong most often, so check yourself against each:
    derives it from score.
 6. No em dashes anywhere. Commas or full stops.
 
-Aim for 8 to 15 postings. Fewer is fine on a slow morning. Do not pad the list to hit a number.
+Aim for 15 to 20 postings. Fewer is fine on a slow morning. Do not pad the list to hit a number.
+
+Reach 15 by widening the sourcing, never by loosening the filters. Read more employer boards, work
+the Tier 2 GTM family across any technology company rather than only AI-native ones, and work
+Tier 3. Do not relax step 0, do not let a Tier 4 engineering role through on its title, and do not
+inflate a score to fill the list. Nine real postings beat eighteen where nine were padding, so when
+the morning falls short, say the count and the reason.
+
+Enumerate a large board with curl piped into a parser rather than a page fetcher. OpenAI's board is
+over 11MB and a 10MB fetch limit failed it silently, surfacing one role instead of ten and missing
+two Tier 1 New York reqs.
 
 If a board-state brief is supplied, the dashboard's "Agent brief" button produces one, honour its
 skip list and match on the URL where a row has one, because an aggregator rewrites the title and the

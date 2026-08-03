@@ -107,6 +107,16 @@
         <span class="jobs-chip"><b id="latest-count">0</b> JOBS<span id="latest-seen" class="jobs-seen"></span></span>
       </div>
 
+      <!-- Only ever shown when the last import flagged something. Dismissible,
+           and the rail card can bring it back. -->
+      <section class="notice" id="notice" aria-labelledby="notice-count" hidden>
+        <div class="notice-head">
+          <p class="label accent" id="notice-count">WORTH A LOOK</p>
+          <button type="button" class="ghost" id="notice-dismiss">Dismiss</button>
+        </div>
+        <ul class="notice-list" id="notice-list"></ul>
+      </section>
+
       <div id="rows"></div>
 
       <div class="empty" id="empty" hidden>
@@ -121,6 +131,11 @@
 
     <!-- Right rail -->
     <aside class="rail">
+      <div class="card">
+        <h3 class="serif">Last import</h3>
+        <p class="rail-note" id="import-log">Nothing imported yet.</p>
+        <button type="button" class="ghost rail-btn" id="notice-show" hidden>Show what was flagged</button>
+      </div>
       <div class="card">
         <h3 class="serif">Your pipeline</h3>
         <ul class="pipe" id="pipeline"></ul>

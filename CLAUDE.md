@@ -315,9 +315,28 @@ pipeline and something to compare against.
 
 ## Open items
 
-- **`ingest/sources.json` tokens are unverified.** They are the conventional careers-page tokens
-  but could not be confirmed, because the sandbox this was built in blocks job-board hosts. Run
-  `python3 ingest/fetch_jobs.py --only greenhouse --only ashby` and prune the `FAIL` lines.
+- **The watchlist is verified, and volume is capped by the prompt rather than by supply.** Every
+  token in `ingest/sources.json` was requested live on 2026-08-03: 70 boards pass, 18 could not be
+  confirmed and sit `enabled: false` with a `_note`. The old seven-employer list had a dead one in
+  it, `greenhouse/notion`, which 404s. Notion is on Ashby.
+
+  Measured the same morning across 67 boards: **11,654 live postings, of which 413 survive every
+  step 0 filter**, 156 of them Tier 1. The **six** live boards the old file actually read were
+  already holding **100** eligible roles. So an 8-role digest was never the market talking. The
+  binding constraint is the `Aim for 8 to 15 postings` line in `prompts/daily-search.md`, and the
+  watchlist is only the second ceiling behind it.
+
+  **Stock and flow are different questions, and the daily cap is right for one of them.** New
+  eligible roles arrive at roughly 8 or 9 per weekday, inferred by scaling a measured Ashby subset
+  where `publishedAt` is a true first-publish date, so 8 to 15 is the correct order of magnitude for
+  a morning. It is the **backlog** the cap cannot serve: median survivor age is 55 days and 413
+  roles have never been seen, so at 8 a morning it takes months. Do not fix that by raising the
+  daily number, which would flood a morning she has to triage by hand. It wants a separate one-time
+  catch-up sweep.
+
+  Re-run `python3 ingest/fetch_jobs.py --only greenhouse --only ashby --only workable` when a
+  familiar employer goes quiet: companies move ATS, and a moved token prints one `FAIL` line rather
+  than breaking the run.
 - **Design values in `styles.css` were read off a screenshot**, so they are approximate. They are
   all in one `:root` block precisely so a measured design system can replace them without
   touching anything else.

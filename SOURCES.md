@@ -31,7 +31,7 @@ employers worth checking every morning.
 | Source | Key | Notes |
 | --- | --- | --- |
 | Adzuna | free app id and key | Real breadth, proper search and location filters. Adapter included, disabled until you add `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` |
-| Remotive | none | Remote roles only. Adapter included and enabled |
+| Remotive | none | Remote roles only. Adapter included and enabled. Measured 2026-08-03: the free feed served 31 postings in total and the `search` parameter changed nothing about which 31 came back, so treat it as a small unfiltered feed the prescore has to sift, not as a search |
 | Arbeitnow | none | Free board feed. Adapter included, disabled by default |
 
 ### Tier 3: LinkedIn and Indeed. This is where the honesty matters.
@@ -91,15 +91,31 @@ That split is deliberate: the deterministic path is the default and the model is
 not the dependency. If the agent is unavailable, or its output looks wrong, you still have a
 working pipeline and something to compare against.
 
-## A caveat about the tokens in `ingest/sources.json`
+## The tokens in `ingest/sources.json` were verified live
 
-The company tokens in that file are the conventional careers-page tokens, but **they were not
-verified against the live endpoints**, because the sandbox this repo was written in blocks
-outbound requests to job-board hosts. Run this first:
+On **2026-08-03** every employer token in that file was requested against its ATS endpoint. A
+token counts as verified only if the endpoint returned HTTP 200 **and** the body parsed as the
+expected shape **and** it carried at least one posting. 70 boards passed: 43 Greenhouse, 25
+Ashby, 2 Workable. Together they were serving **10,200 live postings** that morning.
+
+The board's own name was checked as well, because a 200 does not prove whose board it is. The
+Ashby token `runway` is **cfo.ai**, not Runway ML, so Runway ML sits in the file disabled rather
+than quietly pulling a different company's jobs. That check is the reason to read a board's name
+and not just its status code.
+
+18 companies worth watching could **not** be confirmed, and they are in the file with
+`"enabled": false` and a `_note` recording what the endpoint actually returned, so nobody
+re-guesses the same misses. The list includes Retool, HashiCorp, dbt Labs, Rippling, Sourcegraph,
+Grammarly, Ironclad, Deel, Etsy, Vimeo, DigitalOcean, Lemonade, Chainalysis, Mistral AI, Hebbia
+and Runway ML. Several of those returned 200 with zero postings on a plausible token, which is
+not the same thing as a live board and was not treated as one.
+
+**A token is not a promise about tomorrow.** Companies move ATS. Re-run this when a familiar
+employer goes quiet:
 
 ```
-python3 ingest/fetch_jobs.py --only greenhouse --only ashby
+python3 ingest/fetch_jobs.py --only greenhouse --only ashby --only workable
 ```
 
-Every source is fetched inside its own try block, so a wrong token prints one `FAIL` line with
+Every source is fetched inside its own try block, so a moved token prints one `FAIL` line with
 an HTTP 404 and the run continues. Fix or disable the failures, then trust the list.

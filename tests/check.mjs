@@ -702,6 +702,84 @@ if (!process.env.AUTO_BASE) {
   ok('the page still renders', await auto.isVisible('.row'));
   await auto.evaluate((t) => localStorage.setItem('jsd.token.v1', t), 'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
 
+  /* -- Connecting a browser by hand --------------------------------
+     Opening the plain address imported nothing and said nothing, because the
+     token only ever arrived in a URL hash she had to already have. A working
+     deployment was indistinguishable from a broken one, and the empty state
+     still claimed the board "never fills itself", which auto-import made false. */
+  const conn = await browser.newPage();
+  await conn.goto(AUTO, { waitUntil: 'domcontentloaded' });
+  await conn.evaluate(() => localStorage.clear());
+  await conn.reload({ waitUntil: 'domcontentloaded' });
+  await conn.waitForTimeout(800);
+
+  ok('an unconnected browser is told so rather than sitting silent',
+    await conn.isVisible('#connect'));
+  ok('and is not also told it is connected', !(await conn.isVisible('#connected-note')));
+  ok('and no longer claims the board never fills itself',
+    !/never fills itself/.test(await conn.textContent('#empty')));
+
+  /* The whole link, because that is what she actually has in a bookmark. Asking
+     anyone to pick a 32-character substring out of a URL by hand invites a
+     wrong answer. */
+  await conn.fill('#token-in', 'https://job-search-agent-dashboard.vercel.app/#k=' +
+    'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
+  await conn.click('#token-save');
+  await conn.waitForTimeout(1500);
+  eq('the key is extracted from a full pasted link',
+    await conn.evaluate(() => localStorage.getItem('jsd.token.v1')),
+    'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
+  eq('and the digest imports at once, with no reload to guess at',
+    (await board(conn)).length, 3);
+  ok('and the prompt goes away', await conn.evaluate(() =>
+    document.querySelector('#connect').hidden));
+
+  /* A bare key is the other thing she might paste. */
+  await conn.evaluate(() => localStorage.clear());
+  await conn.reload({ waitUntil: 'domcontentloaded' });
+  await conn.waitForTimeout(600);
+  await conn.fill('#token-in', 'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
+  await conn.click('#token-save');
+  await conn.waitForTimeout(1500);
+  eq('a bare key works too', (await board(conn)).length, 3);
+
+  /* Junk must not be stored. A stored bad key is worse than a rejected one,
+     because it silences the connect prompt and the board goes quiet again. */
+  await conn.evaluate(() => localStorage.clear());
+  await conn.reload({ waitUntil: 'domcontentloaded' });
+  await conn.waitForTimeout(600);
+  await conn.fill('#token-in', 'hello');
+  await conn.click('#token-save');
+  await conn.waitForTimeout(400);
+  eq('junk is not stored as a key',
+    await conn.evaluate(() => localStorage.getItem('jsd.token.v1')), null);
+  ok('and it says why', /does not look like/.test(await conn.textContent('#toast')));
+  ok('and the prompt stays up', await conn.isVisible('#connect'));
+
+  /* A well-formed but wrong key leaves an empty board, exactly as a quiet
+     morning does, so it has to name the likely cause instead. */
+  await conn.fill('#token-in', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+  await conn.click('#token-save');
+  await conn.waitForTimeout(1800);
+  ok('a wrong key is distinguished from a morning with nothing in it',
+    /key is wrong|not the right one/.test(await conn.textContent('#toast')),
+    await conn.textContent('#toast'));
+  await conn.close();
+
+  /* Connected and genuinely empty is not a fault, and must not read as one. */
+  const quiet = await browser.newPage();
+  await quiet.goto(AUTO, { waitUntil: 'domcontentloaded' });
+  await quiet.evaluate((t) => {
+    localStorage.clear(); localStorage.setItem('jsd.token.v1', t);
+  }, 'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84');
+  await quiet.route('**/index.json*', (r) => r.fulfill({ body: '{"digests":[]}' }));
+  await quiet.reload({ waitUntil: 'domcontentloaded' });
+  await quiet.waitForTimeout(900);
+  ok('a connected but empty board says it is connected',
+    await quiet.isVisible('#connected-note'));
+  ok('and does not ask to be connected again', !(await quiet.isVisible('#connect')));
+  await quiet.close();
+
   /* A malformed index must leave the board usable. Offline, a missing file and
      a local file:// open all land here, and none of them is an error state. */
   await auto.goto(AUTO + '/?broken=1', { waitUntil: 'domcontentloaded' });

@@ -55,6 +55,23 @@
     var t = digestToken();
     return t ? 'data/digests/' + t + '/' + file : '';
   }
+
+  /* Accept the whole link as readily as the bare key.
+
+     The link is what she actually has, in a bookmark or a message to herself, and
+     asking someone to extract a 32-character substring from a URL by hand is a
+     way to get a wrong answer. Anything that looks like a key inside the string
+     wins, whether it arrived as `...vercel.app/#k=KEY`, `#k=KEY` or just `KEY`. */
+  function readToken(input) {
+    var s = String(input || '').trim();
+    var m = /(?:^|[#&?])k=([A-Za-z0-9_-]{16,})/.exec(s);
+    if (m) return m[1];
+    return /^[A-Za-z0-9_-]{16,}$/.test(s) ? s : '';
+  }
+
+  function storeToken(t) {
+    try { localStorage.setItem(TOKEN_KEY, t); return true; } catch (e) { return false; }
+  }
   var STATUSES = ['new', 'saved', 'applied', 'interviewing', 'offer', 'closed'];
   var REMOTES = ['onsite', 'hybrid', 'remote', 'unknown'];
 
@@ -617,7 +634,8 @@
     ['last-updated', 'report-label', 'best-company', 'best-meta', 's-inview', 's-strong',
      's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'latest-seen',
      'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast',
-     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show'].forEach(function (id) {
+     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show',
+     'connect', 'connected-note', 'token-in', 'token-save'].forEach(function (id) {
       el[id] = document.getElementById(id);
     });
   }
@@ -869,12 +887,29 @@
     }
   }
 
+  /* An empty board has two completely different causes and they need different
+     words. Not connected: nothing will ever arrive, and there is something to do
+     about it. Connected but empty: everything is working and there is nothing to
+     do, which is a quiet morning rather than a fault.
+
+     Before this, both said "this board never fills itself", which stopped being
+     true when auto-import landed. Opening the plain address imported nothing and
+     explained nothing, so a working deployment was indistinguishable from a
+     broken one, and the only clue was a token in a URL she had to already know. */
+  function renderConnect() {
+    if (!el['connect']) return;
+    var has = !!digestToken();
+    el['connect'].hidden = has;
+    if (el['connected-note']) el['connected-note'].hidden = !has;
+  }
+
   function render() {
     renderStats();
     renderHeader();
     renderRows();
     renderRail();
     renderNotices();
+    renderConnect();
   }
 
   /* Toast ---------------------------------------------------------- */
@@ -1115,6 +1150,49 @@
         rec.dismissed = '';
         saveNotice(rec);
         renderNotices();
+      });
+    }
+
+    /* Connect this browser to the digest path. Imports straight away rather than
+       waiting for a reload, because "paste the link, nothing happens, reload and
+       hope" is the same silence this whole affordance exists to remove. */
+    if (el['token-save']) {
+      var connect = function () {
+        var t = readToken(el['token-in'].value);
+        if (!t) {
+          toast('That does not look like a digest link. Paste the whole link, or just the key from ' +
+                'after the "k=", which is at least 16 letters, numbers, dashes or underscores.');
+          return;
+        }
+        if (!storeToken(t)) {
+          toast('This browser will not let the page store anything, which is usually private ' +
+                'browsing. The link cannot be remembered here, so use Import digest instead.');
+          return;
+        }
+        el['token-in'].value = '';
+        renderConnect();
+        toast('Connected. Looking for a digest now.');
+        autoImport()
+          .then(function (results) {
+            reportAutoImport(results);
+            render();
+            if (!results || !results.length) {
+              /* Distinguish a wrong key from a morning with nothing in it. Both
+                 leave the board empty, and only one of them is her problem. */
+              toast('Connected, but nothing was found at that path yet. Either no digest has been ' +
+                    'published, or the key is not the right one. Check the link and try again.');
+            }
+          })
+          .catch(function () {
+            /* A 404 from a wrong key lands here too, so do not blame the network
+               alone: the likeliest cause by far is a mistyped or stale key. */
+            toast('Connected, but nothing could be read at that path. Usually that means the key is ' +
+                  'wrong. It can also mean this page was opened as a file rather than over http.');
+          });
+      };
+      el['token-save'].addEventListener('click', connect);
+      el['token-in'].addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); connect(); }
       });
     }
 

@@ -478,11 +478,73 @@ await reset(page);
 const dl = await Promise.all([page.waitForEvent('download'), page.click('#export')]).then((r) => r[0]);
 ok('export filename is dated', /^jsd-board-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
   dl.suggestedFilename());
-const exported = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+const exportedFile = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+/* The generation date has to be INSIDE the file. weekly-roundup.md requires the
+   roundup to say when its input was taken, and the filename does not survive a
+   paste, which is how the prompt says the export arrives. */
+ok('export carries its own generation date', /^\d{4}-\d{2}-\d{2}$/.test(exportedFile.exported),
+  JSON.stringify(exportedFile.exported));
+const exported = exportedFile.items;
 eq('export carries the whole board', exported.length, (await board(page)).length);
 ok('export includes the hidden rows', exported.some((r) => r.hidden === true));
 ok('export includes the human fields',
   exported.every((r) => 'status' in r && 'notes' in r && 'hidden' in r));
+
+/* Round trip: a wrapped export must restore, and so must an older bare array,
+   because exports taken before this change are still on her disk. */
+await page.evaluate(() => localStorage.clear());
+await page.reload({ waitUntil: 'domcontentloaded' });
+const wrappedReport = await importJSON(page, exportedFile);
+ok('a wrapped export restores the board', /10 added/.test(wrappedReport), wrappedReport);
+eq('with the human fields intact',
+  (await board(page)).filter((r) => r.hidden).length, 2);
+await page.evaluate(() => localStorage.clear());
+await page.reload({ waitUntil: 'domcontentloaded' });
+const bareReport = await importJSON(page, exported);
+ok('and a bare-array export from an older version still restores',
+  /10 added/.test(bareReport), bareReport);
+
+/* -- The retitled repost, which no exact key catches ---------------
+   An aggregator republishes the same job with its own URL and a suffix on the
+   title. Both keys differ, so this used to import as a second row at status
+   new and put an applied role back in the daily list. */
+console.log('\nRetitled repost');
+await reset(page);
+await page.locator('.row').first().locator('summary').click();
+await page.locator('.row').first().locator('[data-act="applied"]').click();
+await page.waitForTimeout(50);
+const beforeRepost = await rowIds(page);
+const applied = (await board(page)).find((r) => r.status === 'applied' && r.company === 'Halyard Compute');
+const retitled = [{
+  title: applied.title + ' - New York (Hybrid)', company: applied.company,
+  location: 'New York, New York', remote: 'hybrid', source: 'linkedin',
+  url: 'https://example-aggregator.test/retitled/1',
+  apply_url: 'https://example-aggregator.test/retitled/1/apply',
+  posted: applied.posted, score: applied.score,
+  rationale: 'Same job, republished by an aggregator with a suffix on the title.',
+  signal: 'aggregator listing', resume_tailored: false
+}];
+const retitledReport = await importJSON(page, retitled);
+ok('a retitled repost updates rather than adding',
+  /0 added, 1 updated/.test(retitledReport), retitledReport);
+ok('and says it matched loosely, so a wrong merge is visible',
+  /retitled repost/.test(retitledReport), retitledReport);
+eq('the board did not grow', (await board(page)).length, 10);
+eq('the applied role did not return to the list', await rowIds(page), beforeRepost);
+
+/* The guard against over-merging: two genuinely different roles at one employer
+   whose titles differ by a word each are NOT a subset either way. */
+const twoRoles = ['Growth', 'Platform'].map((flavour, n) => ({
+  title: 'Product Manager, ' + flavour, company: 'Sibling Roles Co',
+  location: 'New York, NY', remote: 'hybrid', source: 'greenhouse',
+  url: 'https://example-boards.test/sibling/' + n,
+  apply_url: 'https://example-boards.test/sibling/' + n, posted: '2026-08-01',
+  score: 80, rationale: 'Distinct role at the same employer.',
+  signal: 'employer board page active', resume_tailored: false
+}));
+const siblingReport = await importJSON(page, twoRoles);
+ok('two distinct roles at one employer stay two rows',
+  /2 added/.test(siblingReport), siblingReport);
 
 /* -- Accessibility, the parts that are structural ------------------ */
 console.log('\nAccessibility');

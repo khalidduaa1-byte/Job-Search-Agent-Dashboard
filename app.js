@@ -100,6 +100,45 @@
     return urlKey(rec) || identityKey(rec);
   }
 
+  /* Same employer, and one title is a token subset of the other.
+
+     Exact keys cannot close the last hole. An aggregator republishes
+     "AI Deployment Manager" as "AI Deployment Manager - New York (Hybrid)"
+     under its own URL, so both keys differ and an applied role imported as a
+     fresh row at status new. Measured: 1 added, 0 updated, straight back into
+     the daily list.
+
+     Subset rather than prefix, so it works whichever side is longer, and it is
+     the reason this does not over-merge: "Product Manager, Growth" and
+     "Product Manager, Platform" at one company are neither a subset of the
+     other, because growth and platform each appear on one side only. A suffix
+     an aggregator bolts on is always additive, which is exactly what subset
+     catches.
+
+     Company must match exactly. Two employers with the same role title are a
+     different job and always were. */
+  function titleTokens(rec) {
+    return String(rec.title || '').toLowerCase()
+      .replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  }
+
+  function companyOf(rec) {
+    return String(rec.company || '').toLowerCase()
+      .replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  function looseMatch(rec, other) {
+    if (!companyOf(rec) || companyOf(rec) !== companyOf(other)) return false;
+    var a = titleTokens(rec);
+    var b = titleTokens(other);
+    if (!a.length || !b.length) return false;
+    var shorter = a.length <= b.length ? a : b;
+    var longer = a.length <= b.length ? b : a;
+    /* Guard against a one-word title swallowing everything at that employer. */
+    if (shorter.length < 2) return false;
+    return shorter.every(function (t) { return longer.indexOf(t) !== -1; });
+  }
+
   /* Both keys, so a row matches on either.
 
      The URL alone was not enough. The same posting reaches us from the employer
@@ -251,6 +290,23 @@
         return false;
       });
 
+      /* Neither exact key hit. Before treating this as a new posting, check for
+         the same employer with a title that is a token subset either way, which
+         is how an aggregator's retitled repost looks. Last resort on purpose:
+         the exact keys are cheaper and stricter, so this only runs for rows
+         that would otherwise have been inserted. */
+      if (at === undefined) {
+        for (var b = 0; b < board.length; b++) {
+          if (looseMatch(rec, board[b])) {
+            at = b;
+            warnings.push('row ' + (i + 1) + ': matched "' + board[b].title +
+              '" at the same employer on a retitled repost, so it updated that row ' +
+              'rather than adding a second one. Check this is the same job.');
+            break;
+          }
+        }
+      }
+
       if (at === undefined) {
         board.push({
           id: hashId(key),
@@ -296,8 +352,16 @@
     return board.filter(function (r) { return !r.hidden; });
   }
 
+  /* Over the WHOLE board, hidden rows included.
+
+     Reducing over visible() only meant the date walked backwards: import one
+     role on Tuesday, hide it, and LATEST REPORT reverted to Monday while the top
+     bar still said Tuesday. The two dates in the interface contradicted each
+     other and the results panel denied that a Tuesday report had arrived at all.
+     Hiding a role is a judgment about the role, not evidence about when the
+     report landed. */
   function latestDate() {
-    return visible().reduce(function (acc, r) {
+    return board.reduce(function (acc, r) {
       return r.last_seen > acc ? r.last_seen : acc;
     }, '');
   }
@@ -359,10 +423,17 @@
        staleness weekly-roundup.md forbids the Friday task from causing. */
     var todays = visible().filter(function (r) { return r.last_seen === latest; });
     var arrived = todays.filter(function (r) { return r.first_seen === latest; });
-    el['latest-count'].textContent = arrived.length;
-    el['latest-seen'].textContent = arrived.length === todays.length
-      ? ''
-      : ' new, ' + (todays.length - arrived.length) + ' still live';
+    var reseen = todays.length - arrived.length;
+
+    if (!arrived.length && reseen) {
+      /* "0 JOBS new, 12 still live" is truthful and reads badly, and the day a
+         search finds nothing is exactly the day the line has to be clear. */
+      el['latest-count'].textContent = reseen;
+      el['latest-seen'].textContent = ' still live, nothing new';
+    } else {
+      el['latest-count'].textContent = arrived.length;
+      el['latest-seen'].textContent = reseen ? ' new, ' + reseen + ' still live' : '';
+    }
 
     /* "Best opportunity today" is a recommendation, so it has to respect the
        same rule the daily list does: a role she has already applied to is not
@@ -697,7 +768,23 @@
 
     /* Export */
     document.getElementById('export').addEventListener('click', function () {
-      var blob = new Blob([JSON.stringify(board, null, 2)], { type: 'application/json' });
+      /* Wrapped, with the generation date inside the file.
+
+         It used to export a bare array, so the only record of when it was taken
+         was the filename. prompts/weekly-roundup.md requires the roundup to say
+         when its input was generated, since a three-day-old export is three days
+         of triage out of date, and that was unanswerable from a PASTED export.
+         The filename does not survive a paste.
+
+         Import accepts both shapes, so an older bare-array export still restores. */
+      var payload = {
+        version: 1,
+        exported: todayISO(),
+        note: 'Board export from the Job Search Agent dashboard. ' +
+              'items[] carries status, hidden and notes, so this is a full backup.',
+        items: board
+      };
+      var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'jsd-board-' + todayISO() + '.json';
@@ -774,7 +861,15 @@
           'truncated copy is not, and a phone will often cut the end off.';
         return;
       }
-      if (!Array.isArray(parsed)) parsed = [parsed];
+      /* Accept a board export as well as a digest array. Export now wraps the
+         rows in an object so the generation date travels with a pasted copy, and
+         restoring a backup is the same paste as importing a digest. A bare array
+         is still a digest, and an older export is still a bare array. */
+      if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.items)) {
+        parsed = parsed.items;
+      } else if (!Array.isArray(parsed)) {
+        parsed = [parsed];
+      }
 
       var res = merge(parsed);
       render();

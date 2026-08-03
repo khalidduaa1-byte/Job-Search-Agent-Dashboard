@@ -63,6 +63,14 @@ overwrite the prescore on import, because `score` is an agent-owned field.
 
 ## Setting up the scheduled tasks
 
+**`prompts/scheduled-task.md` has both prompts ready to paste**, plus the settings and the schedule.
+
+**Create them from the claude.ai routines UI, not from an agent session.** That is not a style
+preference. A routine created through the UI can attach a repository source and connectors, and its
+runs appear in the sessions list. Routines created by an agent's `create_trigger` can attach neither,
+and their runs return a `cse_...` identifier rather than `session_...`, which does not appear to
+surface in the same place: three firings produced nothing visible.
+
 Two routines, both firing at 05:00 UTC:
 
 | Routine | Schedule | Reads |

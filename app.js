@@ -17,23 +17,32 @@
   var TOKEN_KEY = 'jsd.token.v1';
   var NOTICE_KEY = 'jsd.notices.v1';
 
-  /* The digest token, and what it does and does not protect.
+  /* The digest path, and the fact that it is not a secret any more.
 
-     Vercel serves every file in the tree, so digests committed to a fixed path
-     would publish which roles she is pursuing, which non-negotiable 8 forbids.
-     Putting them under a long random path segment means the URL is not
-     guessable, nothing links to it, and index.html already sends
-     noindex, nofollow.
+     This token is BAKED IN, on her explicit instruction, so the plain URL fills
+     the board on any device with nothing to paste. Read what that costs and do
+     not undo it by accident in either direction:
 
-     Say the limit out loud: this is UNGUESSABLE, NOT AUTHENTICATED. Anyone who
-     obtains the URL can read the digests. It is strong against crawlers and
-     casual discovery and needs no backend, and her triage, which is the
-     genuinely sensitive half, never leaves localStorage either way. Real
-     authentication means Vercel deployment protection in front of the site,
-     which drops in without changing any of this.
+     The token is in this file, this file is served to anybody who opens the site,
+     so **the digests are readable by anyone with the URL**. Every role the agent
+     surfaced and every score it gave. It is no longer unguessable and it was
+     never authenticated. She was told exactly this and chose it over pasting a
+     link on every device, which is a reasonable trade and hers to make.
 
-     The token arrives once as #k=<token>, is kept in localStorage, and is
-     stripped from the address bar so it does not sit in screenshots or history. */
+     What is still NOT exposed, and this is the half that matters most: her
+     triage. `status`, `hidden` and `notes` live only in localStorage under
+     jsd.board.v1 and are never written to the repo by anything. So the published
+     digests say what the search FOUND. They do not say what she did about it.
+
+     If you want the privacy back, the fix is not to un-embed this. A rotated
+     token would be in the next deploy's source within the hour. The fix is Vercel
+     deployment protection covering PRODUCTION, not just preview deployments,
+     after which this token protects nothing and does not need to.
+
+     A pasted or hash-supplied token still wins over this default, so rotating the
+     path stays possible without a deploy. */
+  var DEFAULT_TOKEN = 'gDvhEI011oXtnnDxKT9LkX5-lc7LCs84';
+
   function digestToken() {
     var fromHash = /(?:^|[#&])k=([A-Za-z0-9_-]{16,})/.exec(location.hash || '');
     if (fromHash) {
@@ -45,9 +54,11 @@
       return fromHash[1];
     }
     try {
-      return localStorage.getItem(TOKEN_KEY) || '';
+      return localStorage.getItem(TOKEN_KEY) || DEFAULT_TOKEN;
     } catch (e) {
-      return '';
+      /* Private mode blocks the read. The default still works, so the board
+         fills rather than sitting empty for want of a storage permission. */
+      return DEFAULT_TOKEN;
     }
   }
 
@@ -56,22 +67,6 @@
     return t ? 'data/digests/' + t + '/' + file : '';
   }
 
-  /* Accept the whole link as readily as the bare key.
-
-     The link is what she actually has, in a bookmark or a message to herself, and
-     asking someone to extract a 32-character substring from a URL by hand is a
-     way to get a wrong answer. Anything that looks like a key inside the string
-     wins, whether it arrived as `...vercel.app/#k=KEY`, `#k=KEY` or just `KEY`. */
-  function readToken(input) {
-    var s = String(input || '').trim();
-    var m = /(?:^|[#&?])k=([A-Za-z0-9_-]{16,})/.exec(s);
-    if (m) return m[1];
-    return /^[A-Za-z0-9_-]{16,}$/.test(s) ? s : '';
-  }
-
-  function storeToken(t) {
-    try { localStorage.setItem(TOKEN_KEY, t); return true; } catch (e) { return false; }
-  }
   var STATUSES = ['new', 'saved', 'applied', 'interviewing', 'offer', 'closed'];
   var REMOTES = ['onsite', 'hybrid', 'remote', 'unknown'];
 
@@ -644,8 +639,7 @@
     ['last-updated', 'report-label', 'best-company', 'best-meta', 's-inview', 's-strong',
      's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'latest-seen',
      'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast',
-     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show',
-     'connect', 'connected-note', 'token-in', 'token-save'].forEach(function (id) {
+     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show'].forEach(function (id) {
       el[id] = document.getElementById(id);
     });
   }
@@ -897,29 +891,12 @@
     }
   }
 
-  /* An empty board has two completely different causes and they need different
-     words. Not connected: nothing will ever arrive, and there is something to do
-     about it. Connected but empty: everything is working and there is nothing to
-     do, which is a quiet morning rather than a fault.
-
-     Before this, both said "this board never fills itself", which stopped being
-     true when auto-import landed. Opening the plain address imported nothing and
-     explained nothing, so a working deployment was indistinguishable from a
-     broken one, and the only clue was a token in a URL she had to already know. */
-  function renderConnect() {
-    if (!el['connect']) return;
-    var has = !!digestToken();
-    el['connect'].hidden = has;
-    if (el['connected-note']) el['connected-note'].hidden = !has;
-  }
-
   function render() {
     renderStats();
     renderHeader();
     renderRows();
     renderRail();
     renderNotices();
-    renderConnect();
   }
 
   /* Toast ---------------------------------------------------------- */
@@ -1160,49 +1137,6 @@
         rec.dismissed = '';
         saveNotice(rec);
         renderNotices();
-      });
-    }
-
-    /* Connect this browser to the digest path. Imports straight away rather than
-       waiting for a reload, because "paste the link, nothing happens, reload and
-       hope" is the same silence this whole affordance exists to remove. */
-    if (el['token-save']) {
-      var connect = function () {
-        var t = readToken(el['token-in'].value);
-        if (!t) {
-          toast('That does not look like a digest link. Paste the whole link, or just the key from ' +
-                'after the "k=", which is at least 16 letters, numbers, dashes or underscores.');
-          return;
-        }
-        if (!storeToken(t)) {
-          toast('This browser will not let the page store anything, which is usually private ' +
-                'browsing. The link cannot be remembered here, so use Import digest instead.');
-          return;
-        }
-        el['token-in'].value = '';
-        renderConnect();
-        toast('Connected. Looking for a digest now.');
-        autoImport()
-          .then(function (results) {
-            reportAutoImport(results);
-            render();
-            if (!results || !results.length) {
-              /* Distinguish a wrong key from a morning with nothing in it. Both
-                 leave the board empty, and only one of them is her problem. */
-              toast('Connected, but nothing was found at that path yet. Either no digest has been ' +
-                    'published, or the key is not the right one. Check the link and try again.');
-            }
-          })
-          .catch(function () {
-            /* A 404 from a wrong key lands here too, so do not blame the network
-               alone: the likeliest cause by far is a mistyped or stale key. */
-            toast('Connected, but nothing could be read at that path. Usually that means the key is ' +
-                  'wrong. It can also mean this page was opened as a file rather than over http.');
-          });
-      };
-      el['token-save'].addEventListener('click', connect);
-      el['token-in'].addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); connect(); }
       });
     }
 

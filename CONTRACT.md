@@ -7,8 +7,15 @@ degrades into a rejected import rather than a corrupted board.
 
 ## One opportunity
 
-Every field is present on every record. The dashboard never branches on a missing key, so the
-agent must emit all nineteen fields even when a value is empty or unknown.
+Nineteen fields exist on a record **on the board**. The agent emits **twelve** of them. The other
+seven are not the agent's to send: three belong to the human and four are derived or assigned by the
+dashboard, and the ownership table below is the authority on which is which.
+
+The dashboard never branches on a missing key, so the agent emits **all twelve of its own fields on
+every record**, even when a value is empty or unknown.
+
+The exact twelve: `title`, `company`, `location`, `remote`, `source`, `url`, `apply_url`, `posted`,
+`score`, `rationale`, `signal`, `resume_tailored`.
 
 | Field | Type | Owner | Notes |
 | --- | --- | --- | --- |
@@ -97,7 +104,6 @@ human pastes:
     "apply_url": "https://boards.greenhouse.io/luminasystems/jobs/4820193#app",
     "posted": "2026-07-24",
     "score": 96,
-    "band": "strong",
     "rationale": "Post-sales adoption ownership for an enterprise AI platform, which is the closest match to the deployment-manager track and to the field rollout she has already run.",
     "signal": "employer greenhouse page active, reposted 2026-07-28",
     "resume_tailored": true
@@ -107,3 +113,7 @@ human pastes:
 
 `status`, `hidden` and `notes` are deliberately absent from that payload. That absence is the
 contract working.
+
+`band` is absent too, and used to be present here while `prompts/daily-search.md` said to omit it.
+The dashboard always derives it from `score`, so emitting it can only create a disagreement to
+report. `id`, `first_seen` and `last_seen` are assigned on import.

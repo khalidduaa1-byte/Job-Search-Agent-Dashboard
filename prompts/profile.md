@@ -47,6 +47,11 @@ authorization is **timing-gated**:
 hours per week** during the academic term is a conflict, and even that needs ISSO signoff. A
 full-time role starting during term is out of scope under constraint 1 anyway.
 
+This one bites on **part-time and contract roles**, which constraint 1 does not cover because they
+are neither full-time nor an internship. A 30 hour a week contract starting October 2026 passes the
+start-date rule and is still impossible. `scoring-rubric.md` implements it: 15 to 20 hours or fewer is
+actionable with the ISSO caveat named, above that is a drop.
+
 **4. No PM title on record.** A hard "3+ years as a Product Manager" screen makes a role
 low-probability regardless of fit. **Deprioritise rather than auto-reject, and flag the screen risk
 in the rationale**, because the useful information is that she loses at the screen and not in the
@@ -139,8 +144,11 @@ a real fit from a title match.
 
 - Hard PM-title requirements, or 5 plus years of product management.
 - Coding screens, take-home engineering assessments, LeetCode-style loops.
-- Roles requiring existing US work authorization with no CPT or OPT accommodation.
-- Start dates before May 2027 for full-time, or before summer 2027 for an internship.
+- **Not** "requires US work authorization": F-1 CPT and OPT *are* authorisation and need no
+  sponsorship. What scores down is a posting that rules out **future** sponsorship, and what gets
+  dropped is one requiring citizenship or permanent residency. `scoring-rubric.md` has the three
+  cases spelled out, because this one sentence was previously a filter, a cap and a penalty at the
+  same time.
 - **Postings with internal inconsistencies**: a location mismatch between header and body, typos,
   responses managed off-platform. Not disqualifying for a Series A company, but **flag it** so she
   confirms the real funnel before spending effort.

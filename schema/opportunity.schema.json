@@ -5,7 +5,8 @@
   "description": "One job opportunity as exchanged between the search agent and the dashboard. See CONTRACT.md for field ownership and the merge policy.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "company", "location", "remote", "source", "url", "score", "rationale"],
+  "required": ["title", "company", "location", "remote", "source", "url", "apply_url", "posted",
+               "score", "rationale", "signal", "resume_tailored"],
   "$comment": "This schema is the agent's obligation: emit all of these. The dashboard is deliberately more tolerant than the schema, and rejects a row only when title, company or score is unusable, coercing the rest with a reported warning. Losing a real opportunity to a missing enum would be worse than showing it with a default. `band` is not required because the dashboard always derives it from `score`.",
   "properties": {
     "id": {

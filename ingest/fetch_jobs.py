@@ -94,11 +94,54 @@ def iso_date(value):
     return ""
 
 
+"""Words that flip the meaning of a phrase that follows them.
+
+Substring matching cannot read, so "no coding screen" and "we run a coding
+screen" look identical to it. That is not a nitpick: a genuine adoption-flavour
+deployment posting says "no coding screen" precisely to distinguish itself from
+the engineering flavour, so a blind matcher penalises the posting we want most
+and ranks the trap above it.
+"""
+NEGATORS = ("no", "not", "never", "without", "zero", "none", "free", "avoid",
+            "excludes", "excluding", "skip", "unlike", "aren't", "arent",
+            "isn't", "isnt", "don't", "dont", "doesn't", "doesnt", "won't",
+            "wont")
+
+# How far back to look for a negator. Wide enough for "there is no ... " and
+# "we do not run a ...", tight enough that a negation two sentences earlier
+# does not reach forward. Sentence punctuation stops the search regardless.
+NEGATION_WINDOW = 40
+
+
+def mentions(blob, pattern):
+    """True when `pattern` appears in `blob` and is not negated.
+
+    Checks every occurrence: a description can both promise "no take-home" in
+    the process section and mention "take-home" in a benefits aside, and one
+    unnegated hit is enough to count.
+    """
+    start = 0
+    while True:
+        at = blob.find(pattern, start)
+        if at == -1:
+            return False
+        window = blob[max(0, at - NEGATION_WINDOW):at]
+        # A sentence boundary between the negator and the phrase breaks the
+        # link, so only look at the text since the last one.
+        for stop in (".", ";", "!", "?", "\n"):
+            cut = window.rfind(stop)
+            if cut != -1:
+                window = window[cut + 1:]
+        if not any(w.strip("'") in NEGATORS for w in re.split(r"[^a-z']+", window) if w):
+            return True
+        start = at + 1
+
+
 def remote_of(location, extra=""):
     blob = (str(location) + " " + str(extra)).lower()
-    if "remote" in blob:
+    if mentions(blob, "remote"):
         return "remote"
-    if "hybrid" in blob:
+    if mentions(blob, "hybrid"):
         return "hybrid"
     if location:
         return "onsite"
@@ -121,6 +164,9 @@ def record(title, company, location, source, url, apply_url="", posted="",
         "rationale": "",
         "signal": "",
         "resume_tailored": False,
+        # Working field, stripped in main() before the file is written. It is
+        # underscore-prefixed because the schema sets additionalProperties:false,
+        # so a record still carrying it will not validate.
         "_description": description or "",
     }
 
@@ -345,7 +391,7 @@ def prescore(rec, rubric):
             break
 
     for kw in rubric["keywords"]:
-        if any(p in blob for p in kw["patterns"]):
+        if any(mentions(blob, p) for p in kw["patterns"]):
             total += kw["points"]
             hits.append("%s (+%d)" % (kw["label"], kw["points"]))
 
@@ -363,7 +409,10 @@ def prescore(rec, rubric):
     penalty_blob = blob + " " + where
 
     for neg in rubric["penalties"]:
-        if any(p in penalty_blob for p in neg["patterns"]):
+        # Negation-aware, and it matters most here. "There is no coding screen"
+        # used to take the full coding-screen penalty, so the deterministic path
+        # ranked a posting with a coding loop above the clean equivalent.
+        if any(mentions(penalty_blob, p) for p in neg["patterns"]):
             total += neg["points"]
             hits.append("%s (%d)" % (neg["label"], neg["points"]))
 
@@ -406,7 +455,9 @@ def main():
     ap.add_argument("--config", default=os.path.join(HERE, "sources.json"))
     ap.add_argument("--out", default=os.path.join(ROOT, "out", "candidates.json"))
     ap.add_argument("--only", action="append", help="limit to these adapters, repeatable")
-    ap.add_argument("--min-score", type=int, default=0, help="drop rows below this prescore")
+    ap.add_argument("--min-score", type=int, default=None,
+                    help="drop rows below this prescore. Default 1, which drops the "
+                         "out-of-scope rows the penalties clamp to 0. Pass 0 to keep them.")
     ap.add_argument("--no-prescore", action="store_true",
                     help="emit score 0 and let the agent score instead")
     args = ap.parse_args()
@@ -416,6 +467,7 @@ def main():
 
     rubric = load_rubric()
     rows, failures = [], []
+    attempted = 0
 
     for entry in config.get("sources", []):
         kind = entry.get("type")
@@ -428,6 +480,7 @@ def main():
             failures.append("%s: no adapter" % kind)
             continue
         label = "%s/%s" % (kind, entry.get("token") or entry.get("query") or "")
+        attempted += 1
         try:
             got = fn(entry)
             rows.extend(got)
@@ -441,10 +494,34 @@ def main():
 
     rows = dedup(rows)
 
+    # Every source failed and nothing came back. Do not write: an empty array
+    # over out/candidates.json destroys the last good run, and a blocked network
+    # is exactly when you want yesterday's file still there. Exit non-zero so a
+    # scheduled task can tell a total outage from a quiet morning.
+    if attempted and not rows and failures and len(failures) == attempted:
+        print("\nevery source failed, %d of %d. Nothing written, %s left as it was."
+              % (len(failures), attempted, args.out), file=sys.stderr)
+        for f in failures:
+            print("  - %s" % f, file=sys.stderr)
+        return 2
+
     if not args.no_prescore:
         rows = [prescore(r, rubric) for r in rows]
-    if args.min_score:
-        rows = [r for r in rows if r["score"] >= args.min_score]
+    else:
+        # The schema requires a non-empty rationale, so a row that skipped the
+        # prescore has to say why it has no score rather than carry "".
+        for r in rows:
+            r["rationale"] = ("Sourced with --no-prescore, so this row is unscored. "
+                              "The agent supplies the score and the rationale.")
+
+    # Non-US rows are clamped to 0 by the out-of-scope penalty, and the rubric
+    # says a non-US role is dropped rather than scored low. Drop them here too,
+    # so the deterministic path and the agent agree. --min-score 0 is now
+    # meaningfully different from omitting it, hence "is not None".
+    floor = args.min_score if args.min_score is not None else (0 if args.no_prescore else 1)
+    dropped = len(rows)
+    rows = [r for r in rows if r["score"] >= floor]
+    dropped -= len(rows)
 
     rows.sort(key=lambda r: (-r["score"], r["company"]))
     for r in rows:
@@ -457,12 +534,17 @@ def main():
         fh.write("\n")
 
     print("\n%d postings written to %s" % (len(rows), args.out), file=sys.stderr)
+    if dropped:
+        print("%d dropped below the score floor of %d, out-of-scope rows land at 0."
+              % (dropped, floor), file=sys.stderr)
     if failures:
         print("%d source(s) failed:" % len(failures), file=sys.stderr)
         for f in failures:
             print("  - %s" % f, file=sys.stderr)
     print("\nPaste the contents into the dashboard's Import digest box.", file=sys.stderr)
-    return 0
+    # Partial failure is still a warning, because a silently missing employer
+    # board looks exactly like a company that posted nothing today.
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

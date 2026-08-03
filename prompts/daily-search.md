@@ -86,6 +86,12 @@ Take the highest-scoring posting. Tailor `resume/master-resume.md` for it using
 If nothing scored 80 or above, do not tailor anything. Say so in the email in one line. A
 tailored resume for a 62 is wasted work and it teaches her to ignore the attachment.
 
+**80 is not a band boundary, and it is doing a specific job.** A full-time posting with no stated
+start date caps at 70, so the 80 threshold means **a tailored resume only ever goes to a role she can
+actually start**: one with a stated start date from May 2027, or an internship for summer 2027. That
+is deliberate. Do not lower it, and do not tailor for a capped role because it was the best of a thin
+morning.
+
 ## 5. Send the email
 
 Subject: `Job search, <weekday> <D Month>, <N> roles, top match <Company> (<score>)`

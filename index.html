@@ -156,6 +156,15 @@
         <p class="rail-note" id="hidden-empty">Nothing hidden yet. Hiding a role keeps it here
           rather than deleting it.</p>
       </div>
+      <!-- Only ever shown when something has actually closed. A card that says
+           "0 closed" every morning is wallpaper, and the morning one of her
+           targets is pulled is the morning it needs to stand out. Same reasoning
+           as the import band above the results. -->
+      <div class="card" id="gone-card" hidden>
+        <h3 class="serif">No longer listed</h3>
+        <p class="rail-note" id="gone-note"></p>
+        <ul class="hidden-list" id="gone-list"></ul>
+      </div>
       <div class="card card-quiet">
         <h3 class="serif">Where this data lives</h3>
         <p class="rail-note">This board is stored in your browser only, under

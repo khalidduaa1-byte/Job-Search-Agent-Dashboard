@@ -23,6 +23,7 @@ framework, no dependencies.** Edit a file, push, it deploys.
 | `prompts/weekly-roundup.md` | The Friday roundup. Emits no JSON, deliberately |
 | `prompts/resume-tailor.md` | Tailoring as a diff against the master resume |
 | `ingest/fetch_jobs.py` | Optional sourcing. Stdlib only, one function per source in `ADAPTERS` |
+| `ingest/check_links.py` | **Is the posting still open?** Asks the employer's board feed, never an HTTP status |
 | `ingest/rubric.json` | Weights for the deterministic keyword prescore |
 | `ingest/sources.json` | The employer watchlist. Tokens are **unverified**, see `SOURCES.md` |
 | `resume/master-resume.md` | **The master resume**, the AI PM and GTM variant. The tailoring input |
@@ -187,6 +188,39 @@ Do not make the band unconditional. A panel that says something every morning be
 the morning it carries a real rejection is the morning it needs to be unusual. That is also why
 posting age is not in it: see the evergreen-requisition rule in non-negotiable 3.
 
+## A posting closing is not an HTTP 404
+
+Postings come down. The board has to say so, and the obvious way of finding out does
+not work.
+
+**A status code tells you nothing here.** Measured across the twenty roles of the
+2026-08-03 digest: **all twenty returned HTTP 200**, including three that were no
+longer listed. Ashby and Greenhouse serve a client-rendered shell, about 7KB of
+loader markup, at the same 200 whether the requisition behind it is open, closed or
+never existed. The "no longer accepting applications" line is painted in afterwards by
+JavaScript. So a HEAD-request checker reports a clean board every morning and is worse
+than none, because it is trusted.
+
+`ingest/check_links.py` asks the **employer's own board feed** instead, the same
+endpoint `fetch_jobs.py` sources from. A posting is open if and only if the board still
+lists its id, and Ashby says so outright with `isListed`. Postings are grouped by
+employer, so a check costs one request per board rather than one per row, and the whole
+413-role backlog would still be about seventy requests.
+
+Three verdicts, and the third is not a failure. `open`, `gone`, and `unknown` meaning
+no feed could be read. **Never report `unknown` as `gone`**: it is a fact about the
+checker, not about the job. Where a company fronts its ATS with its own domain, and
+Asana and Harvey both do, the ATS is looked up by company name in `ingest/sources.json`,
+which is the reason those two went from unverifiable to checked.
+
+The result lands in `data/digests/<token>/liveness.json`, read on load, rendered as a
+`posting closed` chip and a rail card that appears **only when something has actually
+closed**, for the same reason the import band is conditional.
+
+**It never changes a status and never removes a row.** A closed posting is information,
+not a decision, and status is hers under non-negotiable 1. If she already applied, the
+posting closing does not undo the application, and the card says so in as many words.
+
 ## The dedup key
 
 Two keys, and a row matches on **either**:
@@ -301,6 +335,10 @@ seven that matter:
    That is the whole fit-versus-actionability split in one assertion.
 7. Import a digest with a rejected row, then reload: **the report must still be on screen.** Dismiss
    it, reload again, and it must stay dismissed with a way back in the rail.
+8. Import two postings from the **same** board whose titles differ by a real word, and two whose
+   titles differ only by a place: the first pair must stay **two rows**, the second must merge to
+   **one**. Both halves matter. Merging too eagerly deleted a Tier 1 role, merging too little brings
+   an applied role back.
 
 Run the app with `python3 -m http.server 8000`. Drive it with Playwright against the
 pre-installed Chromium rather than downloading one.

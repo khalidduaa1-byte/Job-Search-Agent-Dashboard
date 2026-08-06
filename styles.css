@@ -432,6 +432,14 @@ summary:focus-visible, .restore:focus-visible {
   border: 1px solid var(--hair-strong);
 }
 
+/* The posting is no longer on the employer's board. Warn rather than error:
+   this is not a fault and it is not a rejection, it is the market moving, and
+   if she has already applied it changes nothing about her application. */
+.pill.st-gone {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
 .chev {
   color: var(--muted-light);
   font-size: 11px;

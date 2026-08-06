@@ -1031,6 +1031,37 @@ console.log('\nSeniority does not merge');
   await importJSON(page, [b2('Solutions Consultant - New York', 'https://figma.test/3')]);
   eq('a retitled repost with a location suffix still merges', (await board(page)).length, 1);
 
+  /* Two reqs on ONE board, differing by a word that is not a place.
+
+     Found on the real 2026-08-03 digest: OpenAI's "AI Deployment Manager - NYC"
+     and "AI Deployment Manager - Pilots - NYC" are separate Ashby postings with
+     separate ids, and "pilots" is not a rank, so looseMatch merged them. Twenty
+     rows landed nineteen and a Tier 1 New York role, the single most on-target
+     title in the profile, left the board with only an import warning behind it.
+
+     The distinction the fix draws is what the EXTRA word says. On one employer's
+     board a place name means the same job, anything else means a different job.
+     Both halves are asserted, because a fix in either direction alone is a
+     regression: merge too eagerly and a real role disappears, merge too little
+     and an applied role comes back, which is non-negotiable 2. */
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const oa = (t, u) => Object.assign(b2(t, u), { company: 'OpenAI' });
+  await importJSON(page, [
+    oa('AI Deployment Manager - NYC', 'https://jobs.ashbyhq.test/openai/aaaa1111'),
+    oa('AI Deployment Manager - Pilots - NYC', 'https://jobs.ashbyhq.test/openai/bbbb2222'),
+  ]);
+  eq('two reqs on one board differing by a real word stay two rows',
+    (await board(page)).length, 2);
+
+  /* And the same board with only a place added still merges, so the narrowing
+     did not quietly become "never merge on one host". */
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await importJSON(page, [oa('AI Deployment Manager', 'https://jobs.ashbyhq.test/openai/cccc3333')]);
+  await importJSON(page, [oa('AI Deployment Manager - New York', 'https://jobs.ashbyhq.test/openai/dddd4444')]);
+  eq('the same board with only a place added still merges', (await board(page)).length, 1);
+
   await page.close();
 }
 

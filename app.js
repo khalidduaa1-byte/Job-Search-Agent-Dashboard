@@ -62,6 +62,20 @@
     }
   }
 
+  /* Which postings have been taken down.
+
+     Populated from liveness.json next to the digests, written by
+     ingest/check_links.py. Keyed by the same normalised URL as the dedup key, so
+     a row matches whether or not the digest carried a tracking parameter.
+
+     Deliberately NOT part of the board record. It is a fact about the employer's
+     board on the day it was checked, not about her triage, so it is re-read on
+     every load rather than merged in and exported. A row she has already applied
+     to keeps its status regardless: a closed posting does not undo an
+     application, and status is hers under non-negotiable 1. */
+  var goneUrls = {};
+  var goneChecked = '';
+
   function digestPath(file) {
     var t = digestToken();
     return t ? 'data/digests/' + t + '/' + file : '';
@@ -227,6 +241,43 @@
                'principal', 'lead', 'head', 'director', 'vp', 'intern',
                'i', 'ii', 'iii', 'iv'];
 
+  /* Words that only ever say WHERE a job is, never which job it is. */
+  var PLACES = ['new', 'york', 'nyc', 'ny', 'san', 'francisco', 'sf', 'bay', 'area',
+                'seattle', 'boston', 'austin', 'chicago', 'denver', 'la', 'angeles',
+                'washington', 'dc', 'us', 'usa', 'united', 'states', 'america',
+                'remote', 'hybrid', 'onsite', 'office', 'based', 'east', 'west',
+                'coast', 'north', 'south', 'central', 'region', 'anywhere'];
+
+  /* Same board, different posting id, means two different requisitions.
+
+     looseMatch exists for the AGGREGATOR case: one job reaching us from two
+     different sites under two different titles, where the URLs cannot help.
+     Pointed at a single employer's own board it does the reverse of its job.
+     OpenAI's "AI Deployment Manager - NYC" and "AI Deployment Manager - Pilots -
+     NYC" are separate Ashby reqs with separate ids, and the only token between
+     them is "pilots", which is not a rank, so the second silently updated the
+     first. The board held 19 rows for a 20 row digest and a real Tier 1 New York
+     role was gone, with nothing on screen except an import warning nobody had a
+     reason to reread.
+
+     Blocking every same-host match was too blunt: an employer really does repost
+     the same job on the same board with a location bolted on, and that has to
+     keep merging or an applied role returns, which is non-negotiable 2.
+
+     So the line is what the EXTRA words say. Only a place name may differ on the
+     same board. "Pilots" describes a different job, "New York" describes the same
+     job somewhere. Across different hosts nothing changes, because that is the
+     case this function was written for. */
+  function sameBoardSubstantiveDifference(rec, other, extra) {
+    var a = urlKey(rec);
+    var b = urlKey(other);
+    if (!a || !b || a === b) return false;
+    var ha = a.split('/')[2] || '';
+    var hb = b.split('/')[2] || '';
+    if (!ha || ha !== hb) return false;
+    return extra.some(function (t) { return PLACES.indexOf(t) === -1; });
+  }
+
   function looseMatch(rec, other) {
     if (!companyOf(rec) || companyOf(rec) !== companyOf(other)) return false;
     var a = titleTokens(rec);
@@ -242,6 +293,7 @@
     if (extra.some(function (t) { return RANKS.indexOf(t) !== -1; })) {
       return false;
     }
+    if (sameBoardSubstantiveDifference(rec, other, extra)) return false;
     return true;
   }
 
@@ -639,7 +691,8 @@
     ['last-updated', 'report-label', 'best-company', 'best-meta', 's-inview', 's-strong',
      's-applied', 's-progress', 'result-count', 'latest-date', 'latest-count', 'latest-seen',
      'rows', 'empty', 'pipeline', 'hidden-list', 'hidden-empty', 'toast',
-     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show'].forEach(function (id) {
+     'notice', 'notice-list', 'notice-count', 'import-log', 'notice-show',
+     'gone-card', 'gone-note', 'gone-list'].forEach(function (id) {
       el[id] = document.getElementById(id);
     });
   }
@@ -774,6 +827,15 @@
              seventh child of a six-column grid is what pushed the chevron onto
              a second grid row and squeezed Apply into the 18px chevron column. */
           '<span class="row-actions">' +
+            /* Checked against the employer's own board feed, not an HTTP status:
+               a delisted posting on Ashby or Greenhouse still answers 200 with a
+               loader shell, so a status check calls every dead link healthy. */
+            (isGone(r)
+              ? '<span class="pill st-gone" title="This posting is no longer listed on the ' +
+                'employer\'s job board' + (goneChecked ? ', checked ' + esc(goneChecked) : '') +
+                '. The link may still open a page. Your status and notes are untouched.">' +
+                'posting closed</span>'
+              : '') +
             /* The reason a 93 is not at the top. Without it the sort order looks
                arbitrary: the number says this is the best fit on the board and
                something else is above it, with nothing on screen explaining why. */
@@ -841,6 +903,29 @@
     }).join('') +
     '<li><span class="pipe-row">Hidden<span class="pipe-n' +
     (hiddenRows.length ? ' has' : '') + '">' + hiddenRows.length + '</span></span></li>';
+
+    /* Roles that have come off the employer's board. Listed by name, because
+       "3 closed" with no names means opening every row to find out which. */
+    if (el['gone-card']) {
+      var goneRows = board.filter(isGone);
+      el['gone-card'].hidden = goneRows.length === 0;
+      if (goneRows.length) {
+        el['gone-note'].textContent =
+          (goneRows.length === 1 ? 'One posting is' : goneRows.length + ' postings are') +
+          ' no longer on the employer\'s board' +
+          (goneChecked ? ', checked ' + prettyDate(goneChecked) : '') +
+          '. Nothing has been changed or removed. If you already applied, that stands.';
+        el['gone-list'].innerHTML = goneRows.map(function (r) {
+          return '<li data-id="' + esc(r.id) + '">' +
+                   '<span>' +
+                     '<span class="hid-co">' + esc(r.company) + '</span>' +
+                     '<span class="hid-title">' + esc(r.title) + '</span>' +
+                   '</span>' +
+                   '<span class="pill st-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
+                 '</li>';
+        }).join('');
+      }
+    }
 
     el['hidden-empty'].hidden = hiddenRows.length > 0;
     el['hidden-list'].innerHTML = hiddenRows.map(function (r) {
@@ -1316,6 +1401,32 @@
      routing auto-import through it means an automatic import cannot break a
      guarantee that a manual paste keeps. Do not add a second import path.
   ------------------------------------------------------------------- */
+  /* Read the liveness file, if there is one. Never rejects: a board with no
+     liveness.json is the normal case and must behave exactly as before, and a
+     checker that has not run yet must not stop the digests importing. */
+  function loadLiveness() {
+    var path = digestPath('liveness.json');
+    if (!path) return Promise.resolve();
+    return fetch(path, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !Array.isArray(d.gone)) return;
+        var map = {};
+        d.gone.forEach(function (u) {
+          var k = urlKey({ url: u });
+          if (k) map[k] = true;
+        });
+        goneUrls = map;
+        goneChecked = typeof d.checked === 'string' ? d.checked.slice(0, 10) : '';
+      })
+      .catch(function () { /* offline, or no file. Show nothing rather than guess. */ });
+  }
+
+  function isGone(rec) {
+    var k = urlKey(rec);
+    return !!(k && goneUrls[k]);
+  }
+
   function autoImport() {
     /* No token means no auto-import, and that is a normal state rather than an
        error: anyone opening the site, or her on a device she has not bookmarked
@@ -1428,14 +1539,20 @@
        page opened as a file all mean the same thing here: nothing to import.
        The board must stay fully usable in all three cases, so this failure is
        deliberately quiet, exactly as Load sample data already is. */
-    autoImport()
+    /* Liveness first, so the very first render can already show a closed
+       posting. Chained rather than raced: both hit the same origin, and a row
+       that renders live and then flips a second later is worse than waiting. */
+    loadLiveness()
+      .then(autoImport)
       .then(function (results) {
         /* Record before rendering, not after. The other way round rendered the
            rail card from the previous load's record, so a digest that had just
            landed automatically was described as "nothing imported yet" by the
            one panel whose job is to say that it had. */
         reportAutoImport(results);
-        if (results && results.length) render();
+        /* Render whatever the liveness pass found, even on a morning with no
+           new digest. A posting closing is a change to the board too. */
+        render();
       })
       .catch(function () { /* no digests published, or offline */ });
   });
